@@ -29,16 +29,158 @@ function getRiskLevel(likelihood, impact) {
 }
 
 const RISK_CATALOG = [
-    { id: 1, title: 'Biased training data', description: 'Training data does not represent the deployment population, leading to unfair outcomes.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'HR & Recruitment', 'Law Enforcement', 'Education'], phases: ['Inception', 'Design and Development'] },
-    { id: 2, title: 'Lack of transparency and explainability', description: 'The AI system cannot explain its decisions to stakeholders.', source: 'ISO/IEC 23894 Annex B.3', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
-    { id: 3, title: 'Data quality issues', description: 'Inadequate quality of training and test data affects system functionality and fairness.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Design and Development', 'Verification and Validation'] },
-    { id: 4, title: 'Unintended misuse of the system', description: 'The AI system is used in a context for which it was not originally designed.', source: 'ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
-    { id: 5, title: 'Over-automation without human oversight', description: 'The system operates with insufficient human control, increasing risk of undetected errors.', source: 'ISO/IEC 23894 Annex B.4', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment'] },
-    { id: 6, title: 'Privacy violation through data processing', description: 'Personal data is processed in ways that violate privacy regulations such as GDPR.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'HR & Recruitment', 'Education', 'Finance'], phases: ['Inception', 'Design and Development', 'Operation and Monitoring'] },
-    { id: 7, title: 'Model degradation over time', description: 'System performance degrades due to data drift or changes in the deployment environment.', source: 'ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Operation and Monitoring', 'Re-evaluation'] },
-    { id: 8, title: 'Inadequate verification and validation', description: 'Insufficient testing leads to undetected failures when the system is deployed.', source: 'ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Verification and Validation'] },
-    { id: 9, title: 'Adversarial attacks and data poisoning', description: 'Malicious actors manipulate input data or training data to compromise system behavior.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
-    { id: 10, title: 'Discriminatory automated decisions', description: 'The system produces decisions that systematically disadvantage certain groups.', source: 'ISO/IEC 23894 Annex B.3', domains: ['HR & Recruitment', 'Law Enforcement', 'Finance', 'Education'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
+    {
+        id: 1,
+        title: 'Biased training data',
+        description: 'Training data does not represent the deployment population, leading to unfair outcomes.',
+        source: 'ISO/IEC 23894 Annex B.5',
+        domains: ['Healthcare', 'HR & Recruitment', 'Law Enforcement', 'Education'],
+        phases: ['Inception', 'Design and Development'],
+    },
+    {
+        id: 2,
+        title: 'Lack of transparency and explainability',
+        description: 'The AI system cannot explain its decisions to stakeholders.',
+        source: 'ISO/IEC 23894 Annex B.3',
+        domains: ['Healthcare', 'Finance', 'Law Enforcement'],
+        phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'],
+    },
+    {
+        id: 3,
+        title: 'Data quality issues',
+        description: 'Inadequate quality of training and test data affects system functionality and fairness.',
+        source: 'ISO/IEC 23894 Annex B.5',
+        domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'],
+        phases: ['Inception', 'Design and Development', 'Verification and Validation'],
+    },
+    {
+        id: 4,
+        title: 'Unintended misuse of the system',
+        description: 'The AI system is used in a context for which it was not originally designed.',
+        source: 'ISO/IEC 23894 Annex B.7',
+        domains: ['Healthcare', 'Finance', 'Law Enforcement'],
+        phases: ['Deployment', 'Operation and Monitoring'],
+    },
+    {
+        id: 5,
+        title: 'Over-automation without human oversight',
+        description: 'The system operates with insufficient human control, increasing risk of undetected errors.',
+        source: 'ISO/IEC 23894 Annex B.4',
+        domains: ['Healthcare', 'Finance', 'Law Enforcement'],
+        phases: ['Design and Development', 'Deployment'],
+    },
+    {
+        id: 6,
+        title: 'Privacy violation through data processing',
+        description: 'Personal data is processed in ways that violate privacy regulations such as GDPR.',
+        source: 'ISO/IEC 23894 Annex B.5',
+        domains: ['Healthcare', 'HR & Recruitment', 'Education', 'Finance'],
+        phases: ['Inception', 'Design and Development', 'Operation and Monitoring'],
+    },
+    {
+        id: 7,
+        title: 'Model degradation over time',
+        description: 'System performance degrades due to data drift or changes in the deployment environment.',
+        source: 'ISO/IEC 23894 Annex B.7',
+        domains: ['Healthcare', 'Finance', 'Law Enforcement'],
+        phases: ['Operation and Monitoring', 'Re-evaluation'],
+    },
+    {
+        id: 8,
+        title: 'Inadequate verification and validation',
+        description: 'Insufficient testing leads to undetected failures when the system is deployed.',
+        source: 'ISO/IEC 23894 Annex B.7',
+        domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'],
+        phases: ['Verification and Validation'],
+    },
+    {
+        id: 9,
+        title: 'Adversarial attacks and data poisoning',
+        description: 'Malicious actors manipulate input data or training data to compromise system behavior.',
+        source: 'ISO/IEC 23894 Annex B.5',
+        domains: ['Finance', 'Law Enforcement'],
+        phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'],
+    },
+    {
+        id: 10,
+        title: 'Discriminatory automated decisions',
+        description: 'The system produces decisions that systematically disadvantage certain groups.',
+        source: 'ISO/IEC 23894 Annex B.3',
+        domains: ['HR & Recruitment', 'Law Enforcement', 'Finance', 'Education'],
+        phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'],
+    },
+    {
+        id: 11,
+        title: 'Hardware and infrastructure failures',
+        description: 'Faults in GPU or cloud hardware during training or operation corrupt model behavior in ways that are difficult to detect.',
+        source: 'Steimers & Bömer (2021), Sec. 3.5',
+        domains: ['Healthcare', 'Finance', 'Law Enforcement'],
+        phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'],
+    },
+    {
+        id: 12,
+        title: 'Inadequate operating environment specification',
+        description: 'The system is deployed in a context that was insufficiently described during development, leading to unexpected failures in operation.',
+        source: 'Steimers & Bömer (2021), Sec. 3.3',
+        domains: ['Healthcare', 'Finance', 'Law Enforcement'],
+        phases: ['Inception', 'Design and Development'],
+    },
+    {
+        id: 13,
+        title: 'Use of technologically immature components',
+        description: 'Deployment of insufficiently mature AI technology in safety-critical contexts introduces unknown or poorly understood risk profiles.',
+        source: 'Steimers & Bömer (2021), Sec. 3.6',
+        domains: ['Healthcare', 'Finance', 'Law Enforcement'],
+        phases: ['Inception', 'Design and Development'],
+    },
+    {
+        id: 14,
+        title: 'Hallucination and output unreliability',
+        description: 'The model generates factually incorrect outputs that are presented as correct, with potentially severe consequences in high-stakes decisions.',
+        source: 'Nidhisree et al. (2024), Table I; IBM AI Risk Atlas',
+        domains: ['Healthcare', 'Finance', 'Law Enforcement', 'Education'],
+        phases: ['Deployment', 'Operation and Monitoring'],
+    },
+    {
+        id: 15,
+        title: 'Overreliance on AI recommendations',
+        description: 'Users trust AI outputs without critical review and delegate decisions without adequate human judgment.',
+        source: 'Nidhisree et al. (2024), Table I; MIT AI Risk Repository, Subdomain 5.1',
+        domains: ['Healthcare', 'Finance', 'Education'],
+        phases: ['Deployment', 'Operation and Monitoring'],
+    },
+    {
+        id: 16,
+        title: 'Disinformation and manipulation at scale',
+        description: 'AI systems are deliberately used to generate and spread false information or to manipulate affected individuals at scale.',
+        source: 'MIT AI Risk Repository, Subdomain 4.1',
+        domains: ['Law Enforcement', 'Education', 'HR & Recruitment'],
+        phases: ['Deployment', 'Operation and Monitoring'],
+    },
+    {
+        id: 17,
+        title: 'Loss of human agency in automated decisions',
+        description: 'Affected persons progressively lose the ability to understand, contest, or influence decisions made by AI systems.',
+        source: 'MIT AI Risk Repository, Subdomain 5.2',
+        domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Law Enforcement'],
+        phases: ['Deployment', 'Operation and Monitoring'],
+    },
+    {
+        id: 18,
+        title: 'Prompt injection and model behavior manipulation',
+        description: 'Malicious inputs exploit LLM inference to override intended behavior and produce harmful or unintended outputs.',
+        source: 'IBM AI Risk Atlas: Prompt attacks; Model-behavior manipulation',
+        domains: ['Finance', 'Law Enforcement'],
+        phases: ['Deployment', 'Operation and Monitoring'],
+    },
+    {
+        id: 19,
+        title: 'Lack of AI governance and accountability structures',
+        description: 'Absent or insufficient ownership, accountability, and documentation structures make compliance verification and auditing impossible.',
+        source: 'IBM AI Risk Atlas: Governance; MIT AI Risk Repository, Subdomain 6.5',
+        domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'],
+        phases: ['Inception', 'Deployment', 'Operation and Monitoring'],
+    },
 ]
 
 const PHASES = ['Inception', 'Design and Development', 'Verification and Validation', 'Deployment', 'Operation and Monitoring', 'Re-evaluation', 'Retirement or Replacement']
@@ -133,6 +275,7 @@ function Navbar() {
         { to: '/', label: 'Dashboard' },
         { to: '/scope', label: 'Scope & Criteria' },
         { to: '/risks', label: 'Risks' },
+        { to: '/misuse', label: 'Misuse' },
         { to: '/treatment', label: 'Treatment' },
         { to: '/report', label: 'Report' },
     ]
@@ -296,6 +439,120 @@ function Risks({ scope, risks, setRisks, likelihoodScale, impactScale }) {
     )
 }
 
+const MISUSE_CATEGORIES = [
+    'Use beyond intended scope',
+    'Adversarial attack / prompt injection',
+    'Privacy violation through unauthorized use',
+    'Disinformation & deception',
+    'Overreliance by uninformed user',
+    'Bias amplification through misuse',
+    'Psychological manipulation',
+]
+
+function Misuse({ misuses, setMisuses, likelihoodScale, impactScale }) {
+    function addScenario() {
+        const newScenario = {
+            id: Date.now(),
+            category: MISUSE_CATEGORIES[0],
+            description: '',
+            likelihood: 'Moderate',
+            impact: 'Moderate',
+            level: getRiskLevel('Moderate', 'Moderate'),
+        }
+        setMisuses([...misuses, newScenario])
+    }
+
+    function updateScenario(id, field, value) {
+        setMisuses(misuses.map(m => {
+            if (m.id !== id) return m
+            const updated = { ...m, [field]: value }
+            updated.level = getRiskLevel(updated.likelihood, updated.impact)
+            return updated
+        }))
+    }
+
+    function deleteScenario(id) {
+        setMisuses(misuses.filter(m => m.id !== id))
+    }
+
+    return (
+        <div style={styles.page}>
+            <h1 style={styles.heading}>Misuse Scenarios</h1>
+            <p style={styles.sub}>Reasonably foreseeable misuse — EU AI Act Art. 9(2)(b) · Seghid et al. (2026)</p>
+
+            <button style={styles.button} onClick={addScenario}>+ Add Misuse Scenario</button>
+
+            {misuses.length === 0 && (
+                <div style={{ ...styles.card, marginTop: '24px' }}>
+                    <p style={{ color: '#888', margin: 0 }}>No misuse scenarios defined yet. Click "+ Add Misuse Scenario" to begin.</p>
+                </div>
+            )}
+
+            {misuses.map(m => {
+                const c = levelColor(m.level)
+                return (
+                    <div key={m.id} style={{ ...styles.card, marginTop: '16px', borderLeft: '4px solid #1a1a2e' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                            <div style={{ flex: 1, marginRight: '16px' }}>
+                                <label style={styles.label}>Misuse Category (Seghid et al., 2026)</label>
+                                <select
+                                    style={styles.input}
+                                    value={m.category}
+                                    onChange={e => updateScenario(m.id, 'category', e.target.value)}
+                                >
+                                    {MISUSE_CATEGORIES.map(cat => <option key={cat}>{cat}</option>)}
+                                </select>
+                            </div>
+                            <span style={{ ...styles.badge, background: c.bg, color: c.text, whiteSpace: 'nowrap', marginTop: '20px' }}>
+                                {m.level}
+                            </span>
+                        </div>
+
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={styles.label}>Scenario Description</label>
+                            <textarea
+                                style={{ ...styles.input, height: '80px', resize: 'vertical' }}
+                                placeholder="Describe how this system could be foreseeably misused..."
+                                value={m.description}
+                                onChange={e => updateScenario(m.id, 'description', e.target.value)}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
+                            <div style={{ flex: 1 }}>
+                                <label style={styles.label}>Likelihood (NIST SP 800-30 Table G-3)</label>
+                                <select
+                                    style={styles.input}
+                                    value={m.likelihood}
+                                    onChange={e => updateScenario(m.id, 'likelihood', e.target.value)}
+                                >
+                                    {likelihoodScale.map(l => <option key={l.value}>{l.value}</option>)}
+                                </select>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <label style={styles.label}>Impact (NIST SP 800-30 Table H-3)</label>
+                                <select
+                                    style={styles.input}
+                                    value={m.impact}
+                                    onChange={e => updateScenario(m.id, 'impact', e.target.value)}
+                                >
+                                    {impactScale.map(i => <option key={i.value}>{i.value}</option>)}
+                                </select>
+                            </div>
+                            <button
+                                onClick={() => deleteScenario(m.id)}
+                                style={{ ...styles.buttonOutline, marginTop: 0, color: '#c62828', borderColor: '#c62828' }}
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
+
 function Treatment({ risks }) {
     return (
         <div style={styles.page}>
@@ -376,6 +633,7 @@ function App() {
     const [scope, setScope] = useState({ name: '', domain: '', phase: '' })
     const [likelihoodScale, setLikelihoodScale] = useState(DEFAULT_LIKELIHOOD_SCALE)
     const [impactScale, setImpactScale] = useState(DEFAULT_IMPACT_SCALE)
+    const [misuses, setMisuses] = useState([])
     return (
         <Router>
             <Navbar />
@@ -383,6 +641,7 @@ function App() {
                 <Route path="/" element={<Dashboard risks={risks} />} />
                 <Route path="/scope" element={<Scope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} />} />
                 <Route path="/risks" element={<Risks scope={scope} risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} />} />
+                <Route path="/misuse" element={<Misuse misuses={misuses} setMisuses={setMisuses} likelihoodScale={likelihoodScale} impactScale={impactScale} />} />
                 <Route path="/treatment" element={<Treatment risks={risks} />} />
                 <Route path="/report" element={<Report risks={risks} scope={scope} />} />
             </Routes>
