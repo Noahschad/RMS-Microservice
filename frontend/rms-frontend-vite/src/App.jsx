@@ -606,7 +606,7 @@ const styles = {
     navLinks: { display: 'flex', gap: '24px' },
     navLink: { color: '#ccc', textDecoration: 'none', fontSize: '15px' },
     navLinkActive: { color: '#4fc3f7', fontWeight: 'bold', borderBottom: '2px solid #4fc3f7', paddingBottom: '2px' },
-    page: { padding: '40px', maxWidth: '900px', margin: '0 auto' },
+    page: { padding: '40px 48px', width: '100%', boxSizing: 'border-box' },
     heading: { fontSize: '28px', marginBottom: '8px' },
     sub: { color: '#666', marginBottom: '24px' },
     card: { border: '1px solid #e0e0e0', borderRadius: '8px', padding: '24px', background: '#fafafa' },
