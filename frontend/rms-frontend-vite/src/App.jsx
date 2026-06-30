@@ -404,12 +404,26 @@ function UserForm({ onBegin }) {
     )
 }
 
-function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impactScale, setImpactScale, onNext }) {
+function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impactScale, setImpactScale, assessmentId, onNext }) {
     const [form, setForm] = useState(scope)
     const isValid = form.domain && form.phase
 
-    function save() {
+    async function save() {
         setScope(form)
+        try {
+            await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    current_step: 2,
+                    scope: form,
+                    likelihood_scale: likelihoodScale,
+                    impact_scale: impactScale,
+                }),
+            })
+        } catch (error) {
+            console.error('Failed to save scope:', error)
+        }
         onNext()
     }
 
@@ -448,7 +462,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
     )
 }
 
-function StepRiskIdentification({ scope, risks, setRisks, onBack, onNext }) {
+function StepRiskIdentification({ scope, risks, setRisks, assessmentId, onBack, onNext }) {
     const filtered = RISK_CATALOG.filter(r =>
         (!scope.domain || r.domains.includes(scope.domain)) &&
         (!scope.phase || r.phases.includes(scope.phase))
@@ -460,6 +474,22 @@ function StepRiskIdentification({ scope, risks, setRisks, onBack, onNext }) {
         } else {
             setRisks([...risks, { ...risk, likelihood: 'Moderate', impact: 'Moderate', level: getRiskLevel('Moderate', 'Moderate') }])
         }
+    }
+
+    async function saveAndContinue() {
+        try {
+            await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    current_step: 3,
+                    risks: risks,
+                }),
+            })
+        } catch (error) {
+            console.error('Failed to save risks:', error)
+        }
+        onNext()
     }
 
     return (
@@ -496,12 +526,12 @@ function StepRiskIdentification({ scope, risks, setRisks, onBack, onNext }) {
                 )
             })}
 
-            <NavButtons currentStep={2} onBack={onBack} onNext={onNext} nextDisabled={risks.length === 0} nextLabel={`Continue with ${risks.length} risk${risks.length !== 1 ? 's' : ''} →`} />
+            <NavButtons currentStep={2} onBack={onBack} onNext={saveAndContinue} nextDisabled={risks.length === 0} nextLabel={`Continue with ${risks.length} risk${risks.length !== 1 ? 's' : ''} →`} />
         </div>
     )
 }
 
-function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, onBack, onNext }) {
+function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, assessmentId, onBack, onNext }) {
     function update(id, field, value) {
         setRisks(risks.map(r => {
             if (r.id !== id) return r
@@ -509,6 +539,22 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, onB
             updated.level = getRiskLevel(updated.likelihood, updated.impact)
             return updated
         }))
+    }
+
+    async function saveAndContinue() {
+        try {
+            await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    current_step: 4,
+                    risks: risks,
+                }),
+            })
+        } catch (error) {
+            console.error('Failed to save risk evaluation:', error)
+        }
+        onNext()
     }
 
     return (
@@ -547,12 +593,26 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, onB
                 )
             })}
 
-            <NavButtons currentStep={3} onBack={onBack} onNext={onNext} nextLabel="Continue to Treatment →" />
+            <NavButtons currentStep={3} onBack={onBack} onNext={saveAndContinue} nextLabel="Continue to Treatment →" />
         </div>
     )
 }
 
-function StepTreatment({ risks, onBack, onNext }) {
+function StepTreatment({ risks, assessmentId, onBack, onNext }) {
+
+    async function saveAndContinue() {
+        try {
+            await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ current_step: 5 }),
+            })
+        } catch (error) {
+            console.error('Failed to save treatment step:', error)
+        }
+        onNext()
+    }
+
     return (
         <div style={styles.page}>
             <h1 style={styles.heading}>Risk Treatment</h1>
@@ -574,13 +634,27 @@ function StepTreatment({ risks, onBack, onNext }) {
                         )
                     })}
             </div>
-            <NavButtons currentStep={4} onBack={onBack} onNext={onNext} nextLabel="Continue to Report →" />
+            <NavButtons currentStep={4} onBack={onBack} onNext={saveAndContinue} nextLabel="Continue to Report →" />
         </div>
     )
 }
 
-function StepReport({ risks, scope, user, misuses, onBack }) {
+function StepReport({ risks, scope, user, misuses, assessmentId, onBack }) {
     const high = risks.filter(r => r.level === 'High' || r.level === 'Very High').length
+
+    async function finish() {
+        try {
+            await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'completed' }),
+            })
+            alert('Assessment marked as completed!')
+        } catch (error) {
+            console.error('Failed to finish assessment:', error)
+        }
+    }
+
     return (
         <div style={styles.page}>
             <h1 style={styles.heading}>Report</h1>
@@ -601,7 +675,7 @@ function StepReport({ risks, scope, user, misuses, onBack }) {
                 <p><strong>Status:</strong> {risks.length === 0 ? 'No assessment conducted' : 'Assessment complete'}</p>
                 <button style={styles.button}>Download Report (PDF)</button>
             </div>
-            <NavButtons currentStep={5} onBack={onBack} onNext={() => {}} nextLabel="✓ Finish" />
+            <NavButtons currentStep={5} onBack={onBack} onNext={finish} nextLabel="✓ Finish" />
         </div>
     )
 }
@@ -641,20 +715,44 @@ export default function App() {
     const [likelihoodScale, setLikelihoodScale] = useState(DEFAULT_LIKELIHOOD_SCALE)
     const [impactScale, setImpactScale] = useState(DEFAULT_IMPACT_SCALE)
     const [misueModalOpen, setMisuseModalOpen] = useState(false)
+    const [assessmentId, setAssessmentId] = useState(null)
 
-    function handleBegin(formData) {
-        setUser(formData)
-        setScreen('steps')
-        setCurrentStep(1)
+    async function handleBegin(formData) {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/assessments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ai_system: {
+                        assessor_name: formData.assessorName,
+                        role: formData.role,
+                        ai_system_name: formData.aiSystemName,
+                        date: formData.date,
+                    },
+                    scope: { domain: '', phase: '' },
+                    likelihood_scale: likelihoodScale,
+                    impact_scale: impactScale,
+                }),
+            })
+            const created = await response.json()
+
+            setUser(formData)
+            setAssessmentId(created.id)
+            setScreen('steps')
+            setCurrentStep(1)
+        } catch (error) {
+            console.error('Failed to create assessment:', error)
+            alert('Could not connect to the backend. Is the server running?')
+        }
     }
 
     function renderStep() {
         switch (currentStep) {
-            case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} onNext={() => setCurrentStep(2)} />
-            case 2: return <StepRiskIdentification scope={scope} risks={risks} setRisks={setRisks} onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)} />
-            case 3: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)} />
-            case 4: return <StepTreatment risks={risks} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} />
-            case 5: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} onBack={() => setCurrentStep(4)} />
+            case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} assessmentId={assessmentId} onNext={() => setCurrentStep(2)} />
+            case 2: return <StepRiskIdentification scope={scope} risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)} />
+            case 3: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)} />
+            case 4: return <StepTreatment risks={risks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} />
+            case 5: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} />
             default: return null
         }
     }
