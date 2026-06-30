@@ -35,7 +35,7 @@ const RISK_CATALOG = [
     { id: 1, title: 'Biased training data', description: 'Training data does not represent the deployment population, leading to unfair outcomes.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'HR & Recruitment', 'Law Enforcement', 'Education'], phases: ['Inception', 'Design and Development'] },
     { id: 2, title: 'Lack of transparency and explainability', description: 'The AI system cannot explain its decisions to stakeholders.', source: 'ISO/IEC 23894 Annex B.3', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
     { id: 3, title: 'Data quality issues', description: 'Inadequate quality of training and test data affects system functionality and fairness.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Design and Development', 'Verification and Validation'] },
-    { id: 4, title: 'Unintended misuse of the system', description: 'The AI system is used in a context for which it was not originally designed.', source: 'ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
+    //{ id: 4, title: 'Unintended misuse of the system', description: 'The AI system is used in a context for which it was not originally designed.', source: 'ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
     { id: 5, title: 'Over-automation without human oversight', description: 'The system operates with insufficient human control, increasing risk of undetected errors.', source: 'ISO/IEC 23894 Annex B.4', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment'] },
     { id: 6, title: 'Privacy violation through data processing', description: 'Personal data is processed in ways that violate privacy regulations such as GDPR.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'HR & Recruitment', 'Education', 'Finance'], phases: ['Inception', 'Design and Development', 'Operation and Monitoring'] },
     { id: 7, title: 'Model degradation over time', description: 'System performance degrades due to data drift or changes in the deployment environment.', source: 'ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Operation and Monitoring', 'Re-evaluation'] },
@@ -153,14 +153,14 @@ function MisueFloatingButton({ onClick, count }) {
                 position: 'fixed', bottom: '32px', right: '32px',
                 background: '#1a1a2e', color: 'white',
                 border: '2px solid #4fc3f7', borderRadius: '50px',
-                padding: '12px 20px', cursor: 'pointer',
+                padding: '14px 22px', cursor: 'pointer',
                 fontSize: '13px', fontWeight: 'bold',
                 boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
                 display: 'flex', alignItems: 'center', gap: '8px',
                 zIndex: 200,
             }}
         >
-            ⚠️ Misuse
+            Potential misuse of the AI System
             {count > 0 && (
                 <span style={{ background: '#4fc3f7', color: '#1a1a2e', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold' }}>
                     {count}
@@ -316,13 +316,13 @@ function EditableScaleTable({ scale, setScale, title, source, note }) {
 //Seiten
 function LandingPage({ onStart }) {
     return (
-        <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+        <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #2a2a4a 0%, #243652 60%, #1a4a7a 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
             <div style={{ maxWidth: '720px', textAlign: 'center', color: 'white' }}>
                 <div style={{ fontSize: '13px', letterSpacing: '2px', color: '#4fc3f7', textTransform: 'uppercase', marginBottom: '16px' }}>
                     EU AI Act · Article 9
                 </div>
-                <h1 style={{ fontSize: '48px', fontWeight: 'bold', margin: '0 0 16px', lineHeight: 1.2 }}>
-                    AI Risk Management System
+                <h1 style={{ fontSize: '48px', fontWeight: 'bold', margin: '0 0 16px', lineHeight: 1.2, color: '#4fc3f7' }}>
+                    Risk Management System
                 </h1>
                 <p style={{ fontSize: '18px', color: '#ccc', marginBottom: '32px', lineHeight: 1.6 }}>
                     A structured risk management process for high-risk AI systems, grounded in ISO 31000:2018, ISO/IEC 23894:2023, and NIST SP 800-30.
@@ -362,7 +362,7 @@ function UserForm({ onBegin }) {
 
     return (
         <div style={{ minHeight: '100vh', background: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-            <div style={{ background: 'white', borderRadius: '12px', padding: '48px', width: '100%', maxWidth: '520px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+            <div style={{ background: 'white', borderRadius: '12px', padding: '56px', width: '100%', maxWidth: '680px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
                 <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                     <div style={{ fontSize: '12px', letterSpacing: '2px', color: '#4fc3f7', textTransform: 'uppercase', marginBottom: '8px' }}>New Assessment</div>
                     <h2 style={{ margin: 0, fontSize: '24px', color: '#1a1a2e' }}>Who is conducting this assessment?</h2>
@@ -665,7 +665,7 @@ export default function App() {
 
             <Stepper currentStep={currentStep} onStepClick={setCurrentStep} />
 
-            <div style={{ maxWidth: '960px', margin: '0 auto' }}>
+            <div style={{ width: '100%' }}>
                 {renderStep()}
             </div>
 
