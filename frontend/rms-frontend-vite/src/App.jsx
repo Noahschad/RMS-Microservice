@@ -150,7 +150,7 @@ function MisueFloatingButton({ onClick, count }) {
             onClick={onClick}
             title="Add a misuse scenario at any time"
             style={{
-                position: 'fixed', bottom: '32px', right: '32px',
+                position: 'fixed', top: '76px', right: '32px',
                 background: '#1a1a2e', color: 'white',
                 border: '2px solid #4fc3f7', borderRadius: '50px',
                 padding: '14px 22px', cursor: 'pointer',
@@ -356,6 +356,10 @@ function LandingPage({ onStart }) {
     )
 }
 
+function FieldHint({ text }) {
+    return <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 6px' }}>{text}</p>
+}
+
 function UserForm({ onBegin }) {
     const [form, setForm] = useState({ assessorName: '', role: '', aiSystemName: '', date: new Date().toISOString().split('T')[0] })
     const isValid = form.assessorName.trim() && form.role.trim() && form.aiSystemName.trim() && form.date
@@ -419,6 +423,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                 <div style={styles.formGrid}>
                     <div>
                         <label style={styles.label}>Deployment Domain</label>
+                        <FieldHint text="Filters the risk catalog to risks relevant to your sector." />
                         <select style={styles.input} value={form.domain} onChange={e => setForm({ ...form, domain: e.target.value })}>
                             <option value="">-- Select Domain --</option>
                             {DOMAINS.map(d => <option key={d}>{d}</option>)}
@@ -426,6 +431,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                     </div>
                     <div>
                         <label style={styles.label}>Lifecycle Stage (ISO/IEC 23894 Annex C)</label>
+                        <FieldHint text="The current phase of your AI system — affects which risks are shown." />
                         <select style={styles.input} value={form.phase} onChange={e => setForm({ ...form, phase: e.target.value })}>
                             <option value="">-- Select Phase --</option>
                             {PHASES.map(p => <option key={p}>{p}</option>)}
@@ -524,12 +530,14 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, onB
                         <div style={{ display: 'flex', gap: '16px' }}>
                             <div style={{ flex: 1 }}>
                                 <label style={styles.label}>Likelihood (NIST SP 800-30 Table G-3)</label>
+                                <FieldHint text="How likely is this risk to occur?" />
                                 <select style={styles.input} value={risk.likelihood} onChange={e => update(risk.id, 'likelihood', e.target.value)}>
                                     {likelihoodScale.map(l => <option key={l.value}>{l.value}</option>)}
                                 </select>
                             </div>
                             <div style={{ flex: 1 }}>
                                 <label style={styles.label}>Impact (NIST SP 800-30 Table H-3)</label>
+                                <FieldHint text="How severe would the harm be if it occurred?" />
                                 <select style={styles.input} value={risk.impact} onChange={e => update(risk.id, 'impact', e.target.value)}>
                                     {impactScale.map(i => <option key={i.value}>{i.value}</option>)}
                                 </select>
