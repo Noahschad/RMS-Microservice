@@ -314,7 +314,19 @@ function EditableScaleTable({ scale, setScale, title, source, note }) {
 }
 
 //Seiten
-function LandingPage({ onStart }) {
+function LandingPage({ onStart, onResume }) {
+
+    const [assessments, setAssessments] = useState([])
+    const [loading, setLoading] = useState(true)
+
+    //Beim Laden der Landing Page: alle Assessments vom Backend holen
+    useState(() => {
+        fetch('http://127.0.0.1:8000/assessments')
+            .then(r => r.json())
+            .then(data => { setAssessments(data); setLoading(false) })
+            .catch(() => setLoading(false))
+    }, [])
+
     return (
         <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #2a2a4a 0%, #243652 60%, #1a4a7a 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
             <div style={{ maxWidth: '720px', textAlign: 'center', color: 'white' }}>
@@ -351,6 +363,44 @@ function LandingPage({ onStart }) {
                 <p style={{ fontSize: '12px', color: '#666', marginTop: '16px' }}>
                     Grounded in ISO 31000:2018 · ISO/IEC 23894:2023 · NIST SP 800-30 · NIST AI RMF 1.0
                 </p>
+                {/* Assessments Liste */}
+                {!loading && assessments.length > 0 && (
+                    <div style={{ marginTop: '48px', textAlign: 'left' }}>
+                        <h3 style={{ color: '#4fc3f7', fontSize: '14px', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '16px' }}>
+                            Resume an Assessment
+                        </h3>
+                        {assessments.map(a => {
+                            const isComplete = a.status === 'completed'
+                            const stepLabel = STEPS.find(s => s.id === a.current_step)?.label || 'Unknown'
+                            return (
+                                <div key={a.id} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(79,195,247,0.2)', borderRadius: '10px', padding: '16px 20px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <div style={{ fontWeight: 'bold', color: 'white', fontSize: '15px' }}>
+                                            {a.ai_system.ai_system_name}
+                                        </div>
+                                        <div style={{ fontSize: '13px', color: '#aaa', marginTop: '4px' }}>
+                                            {a.ai_system.assessor_name} · {a.ai_system.date}
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                                            ID: {a.id}
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                                        <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: isComplete ? 'rgba(46,125,50,0.3)' : 'rgba(79,195,247,0.2)', color: isComplete ? '#81c784' : '#4fc3f7', fontWeight: 'bold' }}>
+                                            {isComplete ? '✓ Completed' : `In Progress · Step ${a.current_step}`}
+                                        </span>
+                                        <button
+                                            onClick={() => onResume(a)}
+                                            style={{ padding: '8px 16px', background: isComplete ? 'transparent' : '#4fc3f7', color: isComplete ? '#aaa' : '#1a1a2e', border: isComplete ? '1px solid #555' : 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                        >
+                                            {isComplete ? 'View →' : 'Resume →'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     )
@@ -746,6 +796,23 @@ export default function App() {
         }
     }
 
+    async function handleResume(assessment) {
+        setUser({
+            assessorName: assessment.ai_system.assessor_name,
+            role: assessment.ai_system.role,
+            aiSystemName: assessment.ai_system.ai_system_name,
+            date: assessment.ai_system.date,
+        })
+        setScope(assessment.scope)
+        setRisks(assessment.risks || [])
+        setMisuses(assessment.misuses || [])
+        if (assessment.likelihood_scale?.length) setLikelihoodScale(assessment.likelihood_scale)
+        if (assessment.impact_scale?.length) setImpactScale(assessment.impact_scale)
+        setAssessmentId(assessment.id)
+        setCurrentStep(assessment.current_step || 1)
+        setScreen('steps')
+    }
+
     function renderStep() {
         switch (currentStep) {
             case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} assessmentId={assessmentId} onNext={() => setCurrentStep(2)} />
@@ -757,15 +824,28 @@ export default function App() {
         }
     }
 
-    if (screen === 'landing') return <LandingPage onStart={() => setScreen('form')} />
+    if (screen === 'landing') return <LandingPage onStart={() => setScreen('form')} onResume={handleResume} />
     if (screen === 'form') return <UserForm onBegin={handleBegin} />
 
     return (
         <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
             <nav style={styles.nav}>
-                <div style={styles.navBrand}>RMS</div>
-                <div style={{ fontSize: '13px', color: '#888' }}>
-                    {user.aiSystemName} · {user.assessorName}
+                <div
+                    style={{ ...styles.navBrand, cursor: 'pointer' }}
+                    onClick={() => setScreen('landing')}
+                >
+                    RMS
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                    <div style={{ fontSize: '13px', color: '#888' }}>
+                        {user.aiSystemName} · {user.assessorName}
+                    </div>
+                    <button
+                        onClick={() => setScreen('landing')}
+                        style={{ padding: '7px 16px', background: 'transparent', color: '#4fc3f7', border: '1px solid #4fc3f7', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                    >
+                        {currentStep === 5 ? '← Back to Home' : 'Save & Exit'}
+                    </button>
                 </div>
             </nav>
 
