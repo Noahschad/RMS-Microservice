@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 
 //Konstanten
@@ -19,7 +19,7 @@ const DEFAULT_IMPACT_SCALE = [
 ]
 
 
-//NIST SP 800-30 Table I-2
+//NIST SP 800-30 Table I-2 --> Risk Level
 function getRiskLevel(likelihood, impact) {
     const table = {
         'Very High': { 'Very Low': 'Low', 'Low': 'Moderate', 'Moderate': 'High', 'High': 'Very High', 'Very High': 'Very High' },
@@ -31,6 +31,7 @@ function getRiskLevel(likelihood, impact) {
     return table[likelihood]?.[impact] ?? '—'
 }
 
+//Liste der Risk Sources
 const RISK_CATALOG = [
     { id: 1, title: 'Biased training data', description: 'Training data does not represent the deployment population, leading to unfair outcomes.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'HR & Recruitment', 'Law Enforcement', 'Education'], phases: ['Inception', 'Design and Development'] },
     { id: 2, title: 'Lack of transparency and explainability', description: 'The AI system cannot explain its decisions to stakeholders.', source: 'ISO/IEC 23894 Annex B.3', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
@@ -53,9 +54,11 @@ const RISK_CATALOG = [
     { id: 19, title: 'Lack of AI governance and accountability structures', description: 'Absent or insufficient ownership, accountability, and documentation structures make compliance verification and auditing impossible.', source: 'IBM AI Risk Atlas: Governance; MIT AI Risk Repository, Subdomain 6.5', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Deployment', 'Operation and Monitoring'] },
 ]
 
+//Scope & Criteria
 const PHASES = ['Inception', 'Design and Development', 'Verification and Validation', 'Deployment', 'Operation and Monitoring', 'Re-evaluation', 'Retirement or Replacement']
 const DOMAINS = ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement']
 
+//Misuse
 const MISUSE_CATEGORIES = [
     'Use beyond intended scope',
     'Adversarial attack / prompt injection',
@@ -66,6 +69,29 @@ const MISUSE_CATEGORIES = [
     'Psychological manipulation',
 ]
 
+//Automatisierter Vorschlage für Risk Treatment von "Biased Training Data" und "Discriminatory decisions"
+const TREATMENT_SUGGESTIONS = {
+    1: {
+        option: 'Remove risk source',
+        note: 'Apply dataset rebalancing and bias audit before deployment. Validate demographic parity across all affected groups.',
+        hasSimulation: true,
+        simulationButton: 'Run Bias Audit & Rebalance Dataset',
+        simulationResult: 'Bias audit complete. Underrepresented groups rebalanced. Dataset fairness score: 94%',
+        simulationResidualLikelihood: 'Low',
+        simulationResidualImpact: 'Low',
+    },
+    10: {
+        option: 'Remove risk source',
+        note: 'Apply fairness constraints during training and conduct regular disparate impact audits post-deployment.',
+        hasSimulation: true,
+        simulationButton: 'Apply Fairness Constraints',
+        simulationResult: 'Fairness check complete. Affected applicant groups identified and corrected. Approval rate gap reduced from 29% to 6%.',
+        simulationResidualLikelihood: 'Low',
+        simulationResidualImpact: 'Moderate',
+    },
+}
+
+//5 Prozessschritte
 const STEPS = [
     { id: 1, label: 'Scope & Criteria', sub: 'ISO 31000 Cl. 6.3' },
     { id: 2, label: 'Risk Identification', sub: 'ISO/IEC 23894 Cl. 6.4.2' },
@@ -74,6 +100,7 @@ const STEPS = [
     { id: 5, label: 'Report', sub: 'EU AI Act Art. 9' },
 ]
 
+//Hilfsfunktion für die Farbe
 const levelColor = (level) => {
     if (level === 'Very High' || level === 'High') return { bg: '#fdecea', text: '#c62828' }
     if (level === 'Moderate') return { bg: '#fff3e0', text: '#e65100' }
@@ -123,6 +150,7 @@ function Stepper({ currentStep, onStepClick }) {
     )
 }
 
+//Back/Next Buttons auf jeder Seite
 function NavButtons({ currentStep, onBack, onNext, nextLabel, nextDisabled }) {
     return (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '40px', paddingTop: '24px', borderTop: '1px solid #e0e0e0' }}>
@@ -143,7 +171,7 @@ function NavButtons({ currentStep, onBack, onNext, nextLabel, nextDisabled }) {
     )
 }
 
-//Misuse model
+//Misuse model --> Button oben rechts
 function MisueFloatingButton({ onClick, count }) {
     return (
         <button
@@ -170,6 +198,7 @@ function MisueFloatingButton({ onClick, count }) {
     )
 }
 
+//Panel welches erscheint, wenn man auf den Button klickt
 function MisuseModal({ misuses, setMisuses, likelihoodScale, impactScale, onClose }) {
     function addScenario() {
         setMisuses([...misuses, {
@@ -253,6 +282,7 @@ function MisuseModal({ misuses, setMisuses, likelihoodScale, impactScale, onClos
     )
 }
 
+//Scope & Criteria
 function EditableScaleTable({ scale, setScale, title, source, note }) {
     const [editingIndex, setEditingIndex] = useState(null)
     const [editValue, setEditValue] = useState('')
@@ -313,14 +343,14 @@ function EditableScaleTable({ scale, setScale, title, source, note }) {
     )
 }
 
-//Seiten
+//Hauptseite
 function LandingPage({ onStart, onResume }) {
 
     const [assessments, setAssessments] = useState([])
     const [loading, setLoading] = useState(true)
 
     //Beim Laden der Landing Page: alle Assessments vom Backend holen
-    useState(() => {
+    useEffect(() => {
         fetch('http://127.0.0.1:8000/assessments')
             .then(r => r.json())
             .then(data => { setAssessments(data); setLoading(false) })
@@ -393,7 +423,7 @@ function LandingPage({ onStart, onResume }) {
                                             onClick={() => onResume(a)}
                                             style={{ padding: '8px 16px', background: isComplete ? 'transparent' : '#4fc3f7', color: isComplete ? '#aaa' : '#1a1a2e', border: isComplete ? '1px solid #555' : 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
                                         >
-                                            {isComplete ? 'View →' : 'Resume →'}
+                                            {isComplete ? 'Review & Update →' : 'Resume →'}
                                         </button>
                                     </div>
                                 </div>
@@ -410,6 +440,7 @@ function FieldHint({ text }) {
     return <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 6px' }}>{text}</p>
 }
 
+//Muss vom User ausgefüllt werden
 function UserForm({ onBegin }) {
     const [form, setForm] = useState({ assessorName: '', role: '', aiSystemName: '', date: new Date().toISOString().split('T')[0] })
     const isValid = form.assessorName.trim() && form.role.trim() && form.aiSystemName.trim() && form.date
@@ -454,6 +485,7 @@ function UserForm({ onBegin }) {
     )
 }
 
+//Scope & Criteria Seite
 function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impactScale, setImpactScale, assessmentId, onNext }) {
     const [form, setForm] = useState(scope)
     const isValid = form.domain && form.phase
@@ -489,7 +521,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                         <label style={styles.label}>Deployment Domain</label>
                         <FieldHint text="Filters the risk catalog to risks relevant to your sector." />
                         <select style={styles.input} value={form.domain} onChange={e => setForm({ ...form, domain: e.target.value })}>
-                            <option value="">-- Select Domain --</option>
+                            <option value="">- Select Domain -</option>
                             {DOMAINS.map(d => <option key={d}>{d}</option>)}
                         </select>
                     </div>
@@ -497,7 +529,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                         <label style={styles.label}>Lifecycle Stage (ISO/IEC 23894 Annex C)</label>
                         <FieldHint text="The current phase of your AI system — affects which risks are shown." />
                         <select style={styles.input} value={form.phase} onChange={e => setForm({ ...form, phase: e.target.value })}>
-                            <option value="">-- Select Phase --</option>
+                            <option value="">- Select Phase -</option>
                             {PHASES.map(p => <option key={p}>{p}</option>)}
                         </select>
                     </div>
@@ -512,6 +544,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
     )
 }
 
+//Risiken hinzufügen
 function StepRiskIdentification({ scope, risks, setRisks, assessmentId, onBack, onNext }) {
     const filtered = RISK_CATALOG.filter(r =>
         (!scope.domain || r.domains.includes(scope.domain)) &&
@@ -522,7 +555,18 @@ function StepRiskIdentification({ scope, risks, setRisks, assessmentId, onBack, 
         if (risks.find(r => r.id === risk.id)) {
             setRisks(risks.filter(r => r.id !== risk.id))
         } else {
-            setRisks([...risks, { ...risk, likelihood: 'Moderate', impact: 'Moderate', level: getRiskLevel('Moderate', 'Moderate') }])
+            setRisks([...risks, {
+                ...risk,
+                likelihood: 'Moderate',
+                impact: 'Moderate',
+                level: getRiskLevel('Moderate', 'Moderate'),
+                treatmentStatus: 'none',
+                treatmentOption: '',
+                treatmentNote: '',
+                residualLikelihood: 'Moderate',
+                residualImpact: 'Moderate',
+                residualLevel: getRiskLevel('Moderate', 'Moderate'),
+            }])
         }
     }
 
@@ -581,6 +625,7 @@ function StepRiskIdentification({ scope, risks, setRisks, assessmentId, onBack, 
     )
 }
 
+//Risk level Berechnung
 function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, assessmentId, onBack, onNext }) {
     function update(id, field, value) {
         setRisks(risks.map(r => {
@@ -648,7 +693,91 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
     )
 }
 
-function StepTreatment({ risks, assessmentId, onBack, onNext }) {
+//Treatment options aus ISO 31000 --> 6.5.2
+const ISO_TREATMENT_OPTIONS = [
+    'Avoid the risk',
+    'Remove risk source',
+    'Change likelihood',
+    'Change consequences',
+    'Share the risk',
+    'Retain the risk by informed decision',
+]
+
+function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
+
+    const [simulating, setSimulating] = useState(null) // speichert die ID des Risikos das gerade simuliert wird
+    const [simDone, setSimDone] = useState({}) // speichert welche Simulationen bereits abgeschlossen sind
+
+    const allGreen = risks.every(r => r.treatmentStatus === 'confirmed')
+
+
+    async function runSimulation(id) {
+        const suggestion = TREATMENT_SUGGESTIONS[id]
+        if (!suggestion?.hasSimulation) return
+
+        setSimulating(id) //Ladeanimation starten
+
+        //2 Sekunden warten - simuliert dass im Hintergrund etwas passiert
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        //Ergebnis setzen
+        setRisks(risks.map(r => r.id !== id ? r : {
+            ...r,
+            treatmentOption: suggestion.option,
+            treatmentNote: suggestion.note,
+            residualLikelihood: suggestion.simulationResidualLikelihood,
+            residualImpact: suggestion.simulationResidualImpact,
+            residualLevel: getRiskLevel(suggestion.simulationResidualLikelihood, suggestion.simulationResidualImpact),
+            treatmentStatus: 'suggested',
+        }))
+
+        setSimulating(null) //Ladeanimation stoppen
+        setSimDone(prev => ({ ...prev, [id]: true })) //Simulation als abgeschlossen markieren
+    }
+
+    function applyAuto(id) {
+        const suggestion = TREATMENT_SUGGESTIONS[id]
+        if (!suggestion) return
+        setRisks(risks.map(r => r.id !== id ? r : {
+            ...r,
+            treatmentOption: suggestion.option,
+            treatmentNote: suggestion.note,
+            treatmentStatus: 'suggested',
+            residualLikelihood: suggestion.simulationResidualLikelihood || r.residualLikelihood,
+            residualImpact: suggestion.simulationResidualImpact || r.residualImpact,
+            residualLevel: getRiskLevel(
+                suggestion.simulationResidualLikelihood || r.residualLikelihood,
+                suggestion.simulationResidualImpact || r.residualImpact
+            ),
+        }))
+    }
+
+    //Berechnung des neuen Risk levels anhand der Residuals
+    function updateTreatment(id, field, value) {
+        setRisks(risks.map(r => {
+            if (r.id !== id) return r
+            const updated = { ...r, [field]: value }
+            if (field === 'residualLikelihood' || field === 'residualImpact') {
+                updated.residualLevel = getRiskLevel(
+                    field === 'residualLikelihood' ? value : r.residualLikelihood,
+                    field === 'residualImpact' ? value : r.residualImpact
+                )
+            }
+            return updated
+        }))
+    }
+
+    //Überprüfen des neuen Levels
+    function confirmTreatment(id) {
+        const risk = risks.find(r => r.id === id)
+        if (!risk) return
+        const stillHigh = risk.residualLevel === 'High' || risk.residualLevel === 'Very High'
+        if (stillHigh) {
+            alert(`Residual risk is still "${risk.residualLevel}". Please refine your treatment measure before confirming.`)
+            return
+        }
+        setRisks(risks.map(r => r.id !== id ? r : { ...r, treatmentStatus: 'confirmed' }))
+    }
 
     async function saveAndContinue() {
         try {
@@ -663,32 +792,213 @@ function StepTreatment({ risks, assessmentId, onBack, onNext }) {
         onNext()
     }
 
+    const statusColor = (status) => {
+        if (status === 'confirmed') return { bg: '#e8f5e9', border: '#2e7d32', dot: '#2e7d32', label: '🟢 Treated' }
+        if (status === 'suggested') return { bg: '#fff3e0', border: '#e65100', dot: '#e65100', label: '🟡 In Progress' }
+        return { bg: '#fdecea', border: '#c62828', dot: '#c62828', label: '🔴 No Treatment' }
+    }
+
     return (
         <div style={styles.page}>
             <h1 style={styles.heading}>Risk Treatment</h1>
-            <p style={styles.sub}>Define mitigation measures for each identified risk — ISO 31000 Cl. 6.5</p>
-            <div style={styles.card}>
-                {risks.length === 0
-                    ? <p>No risks selected. Go back and select relevant risks first.</p>
-                    : risks.map(r => {
-                        const c = levelColor(r.level)
-                        return (
-                            <div key={r.id} style={styles.treatmentItem}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <strong>{r.title}</strong>
-                                    <span style={{ ...styles.badge, background: c.bg, color: c.text, whiteSpace: 'nowrap' }}>{r.level}</span>
-                                </div>
-                                <p style={{ margin: '4px 0 0', color: '#888', fontSize: '13px' }}>Likelihood: {r.likelihood} · Impact: {r.impact}</p>
-                                <p style={{ margin: '4px 0 0', color: '#aaa', fontSize: '13px' }}>Treatment plan pending</p>
-                            </div>
-                        )
-                    })}
+            <p style={styles.sub}>Define and confirm mitigation measures — ISO 31000 Cl. 6.5</p>
+
+            {/* Ampel Übersicht */}
+            <div style={{ ...styles.card, marginBottom: '24px', background: allGreen ? '#e8f5e9' : '#fff3e0', border: `1px solid ${allGreen ? '#2e7d32' : '#e65100'}` }}>
+                <p style={{ margin: 0, fontWeight: 'bold', color: allGreen ? '#2e7d32' : '#e65100' }}>
+                    {allGreen
+                        ? '🟢 All risks treated — you may proceed to the Report.'
+                        : `🟡 ${risks.filter(r => r.treatmentStatus !== 'confirmed').length} risk(s) still require treatment before you can proceed.`}
+                </p>
             </div>
-            <NavButtons currentStep={4} onBack={onBack} onNext={saveAndContinue} nextLabel="Continue to Report →" />
+
+            {risks.map(risk => {
+                const c = levelColor(risk.level)
+                const rc = levelColor(risk.residualLevel)
+                const s = statusColor(risk.treatmentStatus)
+
+                return (
+                    <div key={risk.id} style={{ ...styles.card, marginBottom: '20px', borderLeft: `4px solid ${s.border}`, background: s.bg }}>
+
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                            <div>
+                                <strong style={{ fontSize: '15px' }}>{risk.title}</strong>
+                                <p style={{ margin: '4px 0 0', color: '#555', fontSize: '13px' }}>{risk.description}</p>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', marginLeft: '16px' }}>
+                                <span style={{ ...styles.badge, background: c.bg, color: c.text, whiteSpace: 'nowrap' }}>
+                                    Initial: {risk.level}
+                                </span>
+                                <span style={{ fontSize: '12px', color: s.border, fontWeight: 'bold', whiteSpace: 'nowrap' }}>{s.label}</span>
+                            </div>
+                        </div>
+
+                        {risk.treatmentStatus !== 'confirmed' && (
+                            <>
+                                {/* Phase 1 - Treatment definieren */}
+                                <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px', marginBottom: '14px' }}>
+                                    <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 'bold', color: '#1a1a2e' }}>
+                                        Phase 1 — Define Treatment Measure
+                                    </p>
+
+                                    {/* Auto-Suggestion */}
+                                    {TREATMENT_SUGGESTIONS[risk.id] && (
+                                        <div style={{ background: 'rgba(79,195,247,0.08)', border: '1px solid rgba(79,195,247,0.3)', borderRadius: '6px', padding: '12px', marginBottom: '12px' }}>
+                                            <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#1565c0', fontWeight: 'bold' }}>
+                                                💡 Suggested Treatment (ISO 31000 Cl. 6.5.2)
+                                            </p>
+                                            <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#555' }}>
+                                                <strong>{TREATMENT_SUGGESTIONS[risk.id].option}:</strong> {TREATMENT_SUGGESTIONS[risk.id].note}
+                                            </p>
+                                            <button
+                                                onClick={() => applyAuto(risk.id)}
+                                                style={{ ...styles.buttonSelected, marginTop: 0, background: '#1565c0', fontSize: '12px' }}
+                                            >
+                                                ✓ Apply This Treatment
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Manuell */}
+                                    <label style={styles.label}>Treatment Option (ISO 31000 Cl. 6.5.2)</label>
+                                    <select
+                                        style={{ ...styles.input, marginBottom: '10px' }}
+                                        value={risk.treatmentOption}
+                                        onChange={e => updateTreatment(risk.id, 'treatmentOption', e.target.value)}
+                                    >
+                                        <option value="">- Select Treatment Option -</option>
+                                        {ISO_TREATMENT_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                                    </select>
+                                    <label style={styles.label}>Treatment Description <span style={{ color: '#c62828' }}>*</span></label>
+                                    <textarea
+                                        style={{ ...styles.input, height: '70px', resize: 'vertical' }}
+                                        placeholder="Describe the specific measures to be implemented..."
+                                        value={risk.treatmentNote}
+                                        onChange={e => updateTreatment(risk.id, 'treatmentNote', e.target.value)}
+                                    />
+                                    <button
+                                        onClick={() => updateTreatment(risk.id, 'treatmentStatus', 'suggested')}
+                                        disabled={!risk.treatmentOption || !risk.treatmentNote}
+                                        style={{
+                                            ...styles.button,
+                                            marginTop: '12px',
+                                            background: (!risk.treatmentOption || !risk.treatmentNote) ? '#aaa' : '#1565c0',
+                                            cursor: (!risk.treatmentOption || !risk.treatmentNote) ? 'not-allowed' : 'pointer',
+                                            opacity: (!risk.treatmentOption || !risk.treatmentNote) ? 0.6 : 1,
+                                        }}
+                                    >
+                                        Apply Treatment →
+                                    </button>
+                                </div>
+
+                                {/* Phase 2 - Residual Risk einschätzen */}
+                                {risk.treatmentStatus === 'suggested' && (
+                                    <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px', marginBottom: '14px' }}>
+                                        <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 'bold', color: '#1a1a2e' }}>Phase 2 — Assess Residual Risk</p>
+                                        <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#666' }}>
+                                            After applying this measure, how do you assess the remaining risk? (ISO 31000 Cl. 6.5.1)
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
+                                            <div style={{ flex: 1 }}>
+                                                <label style={styles.label}>Residual Likelihood</label>
+                                                <select
+                                                    style={styles.input}
+                                                    value={risk.residualLikelihood}
+                                                    onChange={e => updateTreatment(risk.id, 'residualLikelihood', e.target.value)}
+                                                >
+                                                    {DEFAULT_LIKELIHOOD_SCALE.map(l => <option key={l.value}>{l.value}</option>)}
+                                                </select>
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <label style={styles.label}>Residual Impact</label>
+                                                <select
+                                                    style={styles.input}
+                                                    value={risk.residualImpact}
+                                                    onChange={e => updateTreatment(risk.id, 'residualImpact', e.target.value)}
+                                                >
+                                                    {DEFAULT_IMPACT_SCALE.map(i => <option key={i.value}>{i.value}</option>)}
+                                                </select>
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <label style={styles.label}>Residual Risk Level</label>
+                                                <div style={{
+                                                    padding: '10px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '14px',
+                                                    fontWeight: 'bold',
+                                                    textAlign: 'center',
+                                                    background: rc.bg,
+                                                    color: rc.text,
+                                                }}>
+                                                    {risk.residualLevel}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Warnung wenn noch High/Very High */}
+                                        {(risk.residualLevel === 'High' || risk.residualLevel === 'Very High') && (
+                                            <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
+                                                <p style={{ margin: 0, fontSize: '13px', color: '#c62828', fontWeight: 'bold' }}>
+                                                    ⚠️ Residual risk is still {risk.residualLevel}. Consider refining your treatment measure or choosing a different option before confirming.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Confirm Button */}
+                                {risk.treatmentStatus === 'suggested' && (
+                                    <button onClick={() => confirmTreatment(risk.id)}
+                                        disabled={risk.residualLevel === 'High' || risk.residualLevel === 'Very High'}
+                                        style={{
+                                            ...styles.button,
+                                            marginTop: 0,
+                                            background: (risk.residualLevel === 'High' || risk.residualLevel === 'Very High') ? '#aaa' : '#2e7d32',
+                                            cursor: (risk.residualLevel === 'High' || risk.residualLevel === 'Very High') ? 'not-allowed' : 'pointer',
+                                        }}
+                                    >
+                                        ✓ Confirm Treatment & Accept Residual Risk
+                                    </button>
+                                )}
+                            </>
+                        )}
+
+                        {/* Bestätigt - Zusammenfassung */}
+                        {risk.treatmentStatus === 'confirmed' && (
+                            <div style={{ borderTop: '1px solid #c8e6c9', paddingTop: '12px' }}>
+                                <p style={{ margin: '0 0 4px', fontSize: '13px' }}><strong>Treatment:</strong> {risk.treatmentOption}</p>
+                                <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#555' }}>{risk.treatmentNote}</p>
+                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '13px', color: '#555' }}>
+                                        Residual risk: <strong style={{ color: levelColor(risk.residualLevel).text }}>{risk.residualLevel}</strong>
+                                        {' '}(was: <span style={{ color: levelColor(risk.level).text }}>{risk.level}</span>)
+                                    </span>
+                                    <button
+                                        onClick={() => setRisks(risks.map(r => r.id !== risk.id ? r : { ...r, treatmentStatus: 'none' }))}
+                                        style={{ ...styles.buttonOutline, marginTop: 0, fontSize: '12px' }}
+                                    >
+                                        ✏️ Edit
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )
+            })}
+
+            <NavButtons
+                currentStep={4}
+                onBack={onBack}
+                onNext={saveAndContinue}
+                nextDisabled={!allGreen}
+                nextLabel={allGreen ? 'Continue to Report →' : `${risks.filter(r => r.treatmentStatus !== 'confirmed').length} risk(s) remaining`}
+            />
         </div>
     )
 }
 
+//Report Seite
 function StepReport({ risks, scope, user, misuses, assessmentId, onBack }) {
     const high = risks.filter(r => r.level === 'High' || r.level === 'Very High').length
 
@@ -755,6 +1065,7 @@ const styles = {
     treatmentItem: { padding: '12px 0', borderBottom: '1px solid #f0f0f0' },
 }
 
+//Gesamte App
 export default function App() {
     const [screen, setScreen] = useState('landing') // landing | form | steps
     const [currentStep, setCurrentStep] = useState(1)
@@ -767,6 +1078,8 @@ export default function App() {
     const [misueModalOpen, setMisuseModalOpen] = useState(false)
     const [assessmentId, setAssessmentId] = useState(null)
 
+
+    //Neues assessment anlegen
     async function handleBegin(formData) {
         try {
             const response = await fetch('http://127.0.0.1:8000/assessments', {
@@ -796,6 +1109,7 @@ export default function App() {
         }
     }
 
+    //Bestehendes assessment fortsetzen bzw. bei abgeschlossenen wieder Schritt 1 öffnen  --> Re-evaluation
     async function handleResume(assessment) {
         setUser({
             assessorName: assessment.ai_system.assessor_name,
@@ -809,7 +1123,7 @@ export default function App() {
         if (assessment.likelihood_scale?.length) setLikelihoodScale(assessment.likelihood_scale)
         if (assessment.impact_scale?.length) setImpactScale(assessment.impact_scale)
         setAssessmentId(assessment.id)
-        setCurrentStep(assessment.current_step || 1)
+        setCurrentStep(assessment.status === 'completed' ? 1 : (assessment.current_step || 1))
         setScreen('steps')
     }
 
@@ -818,13 +1132,26 @@ export default function App() {
             case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} assessmentId={assessmentId} onNext={() => setCurrentStep(2)} />
             case 2: return <StepRiskIdentification scope={scope} risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)} />
             case 3: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)} />
-            case 4: return <StepTreatment risks={risks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} />
+            case 4: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} />
             case 5: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} />
             default: return null
         }
     }
 
-    if (screen === 'landing') return <LandingPage onStart={() => setScreen('form')} onResume={handleResume} />
+    //Alle states zurücksetzen
+    function resetAll() {
+        setUser({ assessorName: '', role: '', aiSystemName: '', date: '' })
+        setScope({ domain: '', phase: '' })
+        setRisks([])
+        setMisuses([])
+        setLikelihoodScale(DEFAULT_LIKELIHOOD_SCALE)
+        setImpactScale(DEFAULT_IMPACT_SCALE)
+        setAssessmentId(null)
+        setCurrentStep(1)
+        setScreen('form')
+    }
+
+    if (screen === 'landing') return <LandingPage onStart={resetAll} onResume={handleResume} />
     if (screen === 'form') return <UserForm onBegin={handleBegin} />
 
     return (
@@ -832,8 +1159,7 @@ export default function App() {
             <nav style={styles.nav}>
                 <div
                     style={{ ...styles.navBrand, cursor: 'pointer' }}
-                    onClick={() => setScreen('landing')}
-                >
+                    onClick={() => { resetAll(); setScreen('landing') }}                >
                     RMS
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
@@ -841,7 +1167,7 @@ export default function App() {
                         {user.aiSystemName} · {user.assessorName}
                     </div>
                     <button
-                        onClick={() => setScreen('landing')}
+                        onClick={() => { resetAll(); setScreen('landing') }}
                         style={{ padding: '7px 16px', background: 'transparent', color: '#4fc3f7', border: '1px solid #4fc3f7', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
                     >
                         {currentStep === 5 ? '← Back to Home' : 'Save & Exit'}
