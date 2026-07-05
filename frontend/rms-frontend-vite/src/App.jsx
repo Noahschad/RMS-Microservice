@@ -512,7 +512,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
     return (
         <div style={styles.page}>
             <h1 style={styles.heading}>Scope & Criteria</h1>
-            <p style={styles.sub}>Define the context of the AI system under assessment — ISO 31000 Cl. 6.3 · ISO/IEC 23894 Cl. 6.3</p>
+            <p style={styles.sub}>Define the context of the AI system under assessment - ISO 31000 Cl. 6.3 · ISO/IEC 23894 Cl. 6.3</p>
 
             <div style={styles.card}>
                 <h3 style={{ marginTop: 0 }}>AI System Context</h3>
@@ -527,7 +527,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                     </div>
                     <div>
                         <label style={styles.label}>Lifecycle Stage (ISO/IEC 23894 Annex C)</label>
-                        <FieldHint text="The current phase of your AI system — affects which risks are shown." />
+                        <FieldHint text="The current phase of your AI system - affects which risks are shown." />
                         <select style={styles.input} value={form.phase} onChange={e => setForm({ ...form, phase: e.target.value })}>
                             <option value="">- Select Phase -</option>
                             {PHASES.map(p => <option key={p}>{p}</option>)}
@@ -851,12 +851,48 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
                                             <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#555' }}>
                                                 <strong>{TREATMENT_SUGGESTIONS[risk.id].option}:</strong> {TREATMENT_SUGGESTIONS[risk.id].note}
                                             </p>
-                                            <button
-                                                onClick={() => applyAuto(risk.id)}
-                                                style={{ ...styles.buttonSelected, marginTop: 0, background: '#1565c0', fontSize: '12px' }}
-                                            >
-                                                ✓ Apply This Treatment
-                                            </button>
+
+                                            {/* Simulations-Ergebnis anzeigen wenn fertig */}
+                                            {simDone[risk.id] && (
+                                                <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
+                                                    <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
+                                                        ✅ {TREATMENT_SUGGESTIONS[risk.id].simulationResult}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                {/* Manuell übernehmen */}
+                                                <button
+                                                    onClick={() => applyAuto(risk.id)}
+                                                    disabled={simulating === risk.id}
+                                                    style={{ ...styles.buttonSelected, marginTop: 0, background: '#1565c0', fontSize: '12px' }}
+                                                >
+                                                    ✓ Apply This Treatment
+                                                </button>
+
+                                                {/* Simulations-Button */}
+                                                {TREATMENT_SUGGESTIONS[risk.id].hasSimulation && (
+                                                    <button
+                                                        onClick={() => runSimulation(risk.id)}
+                                                        disabled={simulating !== null || simDone[risk.id]}
+                                                        style={{
+                                                            ...styles.button,
+                                                            marginTop: 0,
+                                                            background: simDone[risk.id] ? '#aaa' : '#2e7d32',
+                                                            fontSize: '12px',
+                                                            cursor: (simulating !== null || simDone[risk.id]) ? 'not-allowed' : 'pointer',
+                                                            opacity: simDone[risk.id] ? 0.6 : 1,
+                                                        }}
+                                                    >
+                                                        {simulating === risk.id
+                                                            ? 'Running...'
+                                                            : simDone[risk.id]
+                                                                ? 'Completed'
+                                                                : `${TREATMENT_SUGGESTIONS[risk.id].simulationButton}`}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
 
