@@ -34,7 +34,7 @@ function getRiskLevel(likelihood, impact) {
 
 //Liste der Risk Sources
 const RISK_CATALOG = [
-    { id: 1, title: 'Biased training data', description: 'Training data does not represent the deployment population, leading to unfair outcomes.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'HR & Recruitment', 'Law Enforcement', 'Education'], phases: ['Inception', 'Design and Development'] },
+    { id: 1, title: 'Biased training data', description: 'Training data does not represent the deployment population, leading to unfair outcomes.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'HR & Recruitment', 'Finance', 'Law Enforcement', 'Education'], phases: ['Inception', 'Design and Development'] },
     { id: 2, title: 'Lack of transparency and explainability', description: 'The AI system cannot explain its decisions to stakeholders.', source: 'ISO/IEC 23894 Annex B.3', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
     { id: 3, title: 'Data quality issues', description: 'Inadequate quality of training and test data affects system functionality and fairness.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Design and Development', 'Verification and Validation'] },
     //{ id: 4, title: 'Unintended misuse of the system', description: 'The AI system is used in a context for which it was not originally designed.', source: 'ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
@@ -86,7 +86,7 @@ const TREATMENT_SUGGESTIONS = {
         note: 'Apply fairness constraints during training and conduct regular disparate impact audits post-deployment.',
         hasSimulation: true,
         simulationButton: 'Apply Fairness Constraints',
-        simulationResult: 'Fairness check complete. Affected applicant groups identified and corrected. Approval rate gap reduced from 29% to 6%.',
+        simulationResult: 'Fairness check complete. Affected borrower groups identified and corrected. Loan approval rate gap reduced from 31% to 5%.',
         simulationResidualLikelihood: 'Low',
         simulationResidualImpact: 'Moderate',
     },
@@ -466,7 +466,7 @@ function UserForm({ onBegin }) {
                     </div>
                     <div>
                         <label style={styles.label}>AI System Name</label>
-                        <input style={styles.input} placeholder="e.g. HR Screening Model" value={form.aiSystemName} onChange={e => setForm({ ...form, aiSystemName: e.target.value })} />
+                        <input style={styles.input} placeholder="e.g. Credit Scoring Model" value={form.aiSystemName} onChange={e => setForm({ ...form, aiSystemName: e.target.value })} />
                     </div>
                     <div>
                         <label style={styles.label}>Assessment Date</label>
