@@ -233,7 +233,7 @@ function MisuseModal({ misuses, setMisuses, likelihoodScale, impactScale, onClos
                     <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#666' }}>✕</button>
                 </div>
                 <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>
-                    Reasonably foreseeable misuse — EU AI Act Art. 9(2)(b) · Seghid et al. (2026)<br />
+                    Reasonably foreseeable misuse - EU AI Act Art. 9(2)(b) · Seghid et al. (2026)<br />
                     <em>You can add misuse scenarios at any point during the assessment.</em>
                 </p>
 
@@ -802,7 +802,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
     return (
         <div style={styles.page}>
             <h1 style={styles.heading}>Risk Treatment</h1>
-            <p style={styles.sub}>Define and confirm mitigation measures — ISO 31000 Cl. 6.5</p>
+            <p style={styles.sub}>Define and confirm mitigation measures - ISO 31000 Cl. 6.5</p>
 
             {/* Ampel Übersicht */}
             <div style={{ ...styles.card, marginBottom: '24px', background: allGreen ? '#e8f5e9' : '#fff3e0', border: `1px solid ${allGreen ? '#2e7d32' : '#e65100'}` }}>
@@ -840,7 +840,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
                                 {/* Phase 1 - Treatment definieren */}
                                 <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px', marginBottom: '14px' }}>
                                     <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 'bold', color: '#1a1a2e' }}>
-                                        Phase 1 — Define Treatment Measure
+                                        Phase 1 - Define Treatment Measure
                                     </p>
 
                                     {/* Auto-Suggestion */}
@@ -932,7 +932,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
                                 {/* Phase 2 - Residual Risk einschätzen */}
                                 {risk.treatmentStatus === 'suggested' && (
                                     <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px', marginBottom: '14px' }}>
-                                        <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 'bold', color: '#1a1a2e' }}>Phase 2 — Assess Residual Risk</p>
+                                        <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 'bold', color: '#1a1a2e' }}>Phase 2 - Assess Residual Risk</p>
                                         <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#666' }}>
                                             After applying this measure, how do you assess the remaining risk? (ISO 31000 Cl. 6.5.1)
                                         </p>
@@ -1160,7 +1160,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack }) {
     return (
         <div style={styles.page}>
             <h1 style={styles.heading}>Report</h1>
-            <p style={styles.sub}>Risk Assessment Documentation — EU AI Act Art. 9 · Annex IV</p>
+            <p style={styles.sub}>Risk Assessment Documentation - EU AI Act Art. 9 · Annex IV</p>
             <div style={styles.card}>
                 <h3 style={{ marginTop: 0 }}>Assessment Summary</h3>
                 <p><strong>Assessor:</strong> {user.assessorName} ({user.role})</p>
