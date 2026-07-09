@@ -428,6 +428,23 @@ function LandingPage({ onStart, onResume }) {
                                         <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: isComplete ? 'rgba(46,125,50,0.3)' : 'rgba(79,195,247,0.2)', color: isComplete ? '#81c784' : '#4fc3f7', fontWeight: 'bold' }}>
                                             {isComplete ? '✓ Completed' : `In Progress · Step ${a.current_step}`}
                                         </span>
+                                        {isComplete && (() => {
+                                            const idx = PHASES.indexOf(a.scope?.phase)
+                                            const pending = idx >= 0 ? PHASES.slice(idx + 1) : []
+                                            const pendingLabel = pending.length > 2
+                                                ? `${pending.slice(0, 2).join(', ')} +${pending.length - 2} more`
+                                                : pending.join(', ')
+                                            return (
+                                                <div style={{ fontSize: '11px', color: '#8fa5c2', textAlign: 'right', maxWidth: '260px', lineHeight: 1.5 }}>
+                                                    Stage: <strong style={{ color: '#4fc3f7' }}>{a.scope?.phase || '—'}</strong>
+                                                    {pending.length > 0 ? (
+                                                        <div>Pending: {pendingLabel}</div>
+                                                    ) : (
+                                                        <div style={{ color: '#81c784' }}>Final stage reached</div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })()}
                                         <button
                                             onClick={() => onResume(a)}
                                             style={{ padding: '8px 16px', background: isComplete ? 'transparent' : '#4fc3f7', color: isComplete ? '#4fc3f7' : '#1a1a2e', border: isComplete ? '1px solid #4fc3f7' : 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
@@ -581,7 +598,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                         </p>
                     ) : (
                         <p style={{ margin: '10px 0 0', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
-                            ✓ Updated from "{previousPhase}" to "{form.phase}".
+                            Updated from "{previousPhase}" to "{form.phase}".
                         </p>
                     )
                 )}
@@ -1098,7 +1115,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
 }
 
 //Report Seite
-function StepReport({ risks, scope, user, misuses, assessmentId, onBack }) {
+function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinish }) {
     const high = risks.filter(r => r.level === 'High' || r.level === 'Very High').length
 
     const [downloading, setDownloading] = useState(false)
@@ -1213,7 +1230,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: 'completed' }),
             })
-            alert('Assessment marked as completed!')
+            onFinish()
         } catch (error) {
             console.error('Failed to finish assessment:', error)
         }
@@ -1332,6 +1349,7 @@ export default function App() {
 
     //Bestehendes assessment fortsetzen bzw. bei abgeschlossenen wieder Schritt 1 öffnen  --> Re-evaluation
     async function handleResume(assessment) {
+        const isReassessment = assessment.status === 'completed'
         setUser({
             assessorName: assessment.ai_system.assessor_name,
             role: assessment.ai_system.role,
@@ -1339,13 +1357,13 @@ export default function App() {
             date: assessment.ai_system.date,
         })
         setScope(assessment.scope)
-        setRisks(assessment.risks || [])
+        setRisks(isReassessment ? [] : (assessment.risks || []))
         setMisuses(assessment.misuses || [])
         if (assessment.likelihood_scale?.length) setLikelihoodScale(assessment.likelihood_scale)
         if (assessment.impact_scale?.length) setImpactScale(assessment.impact_scale)
         setAssessmentId(assessment.id)
-        setPreviousPhase(assessment.status === 'completed' ? assessment.scope.phase : null)
-        setCurrentStep(assessment.status === 'completed' ? 1 : (assessment.current_step || 1))
+        setPreviousPhase(isReassessment ? assessment.scope.phase : null)
+        setCurrentStep(isReassessment ? 1 : (assessment.current_step || 1))
         setScreen('steps')
     }
 
@@ -1355,7 +1373,7 @@ export default function App() {
             case 2: return <StepRiskIdentification scope={scope} risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)} />
             case 3: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)} />
             case 4: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} />
-            case 5: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} />
+            case 5: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} onFinish={() => setScreen('landing')} />
             default: return null
         }
     }
