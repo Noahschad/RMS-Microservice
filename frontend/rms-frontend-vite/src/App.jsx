@@ -19,7 +19,6 @@ const DEFAULT_IMPACT_SCALE = [
     { value: 'Very High', score: 10, description: 'The threat event could be expected to have multiple severe or catastrophic adverse effects on operations, assets, and individuals.' },
 ]
 
-
 //NIST SP 800-30 Table I-2 --> Risk Level
 function getRiskLevel(likelihood, impact) {
     const table = {
@@ -107,6 +106,15 @@ const levelColor = (level) => {
     if (level === 'Moderate') return { bg: '#fff3e0', text: '#e65100' }
     if (level === 'Low') return { bg: '#e8f5e9', text: '#2e7d32' }
     return { bg: '#f5f5f5', text: '#888' }
+}
+
+//Einheitliches Farbschema
+const COLORS = {
+    navy: '#1a1a2e',
+    accent: '#4fc3f7',
+    bgLight: '#c9dced',
+    cardBg: '#ffffff',
+    cardBorder: '#a8c8e0',
 }
 
 //Schritte 1-5
@@ -359,7 +367,7 @@ function LandingPage({ onStart, onResume }) {
     }, [])
 
     return (
-        <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #2a2a4a 0%, #243652 60%, #1a4a7a 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+        <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #243652 0%, #1a4a7a 55%, #2b6ca3 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
             <div style={{ maxWidth: '720px', textAlign: 'center', color: 'white' }}>
                 <div style={{ fontSize: '13px', letterSpacing: '2px', color: '#4fc3f7', textTransform: 'uppercase', marginBottom: '16px' }}>
                     EU AI Act · Article 9
@@ -447,8 +455,7 @@ function UserForm({ onBegin }) {
     const isValid = form.assessorName.trim() && form.role.trim() && form.aiSystemName.trim() && form.date
 
     return (
-        <div style={{ minHeight: '100vh', background: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-            <div style={{ background: 'white', borderRadius: '12px', padding: '56px', width: '100%', maxWidth: '680px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+        <div style={{ minHeight: '100vh', background: COLORS.bgLight, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>            <div style={{ background: 'white', borderRadius: '12px', padding: '56px', width: '100%', maxWidth: '680px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
                 <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                     <div style={{ fontSize: '12px', letterSpacing: '2px', color: '#4fc3f7', textTransform: 'uppercase', marginBottom: '8px' }}>New Assessment</div>
                     <h2 style={{ margin: 0, fontSize: '24px', color: '#1a1a2e' }}>Who is conducting this assessment?</h2>
@@ -1204,13 +1211,12 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack }) {
 const styles = {
     nav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', height: '56px', background: '#1a1a2e', color: 'white' },
     navBrand: { fontWeight: 'bold', fontSize: '18px', color: '#4fc3f7', letterSpacing: '1px' },
-    stepperWrap: { background: 'white', borderBottom: '1px solid #e0e0e0', padding: '20px 48px' },
+    stepperWrap: { background: '#eef5fb', borderBottom: '1px solid #d6e8f5', padding: '20px 48px' },
     stepperInner: { display: 'flex', alignItems: 'flex-start', maxWidth: '900px' },
     page: { padding: '40px 48px', width: '100%', boxSizing: 'border-box' },
     heading: { fontSize: '28px', marginBottom: '8px', color: '#1a1a2e' },
     sub: { color: '#666', marginBottom: '24px', fontSize: '14px' },
-    card: { border: '1px solid #e0e0e0', borderRadius: '8px', padding: '24px', background: '#fafafa' },
-    cardRow: { display: 'flex', gap: '16px' },
+    card: { border: `1px solid ${COLORS.cardBorder}`, borderRadius: '8px', padding: '24px', background: COLORS.cardBg },    cardRow: { display: 'flex', gap: '16px' },
     formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
     label: { display: 'block', fontSize: '13px', color: '#555', marginBottom: '4px', fontWeight: '500' },
     input: { padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', width: '100%', boxSizing: 'border-box' },
@@ -1315,7 +1321,7 @@ export default function App() {
     if (screen === 'form') return <UserForm onBegin={handleBegin} />
 
     return (
-        <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
+        <div style={{ minHeight: '100vh', background: COLORS.bgLight }}>
             <nav style={styles.nav}>
                 <div
                     style={{ ...styles.navBrand, cursor: 'pointer' }}
