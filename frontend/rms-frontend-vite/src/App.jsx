@@ -13,9 +13,9 @@ const DEFAULT_LIKELIHOOD_SCALE = [
 
 const DEFAULT_IMPACT_SCALE = [
     { value: 'Very Low', score: 0, description: 'The threat event could be expected to have a negligible adverse effect on organizational operations, assets, or individuals.' },
-    { value: 'Low', score: 2, description: 'The threat event could be expected to have a limited adverse effect — minor damage to assets, minor financial loss, or minor harm to individuals.' },
-    { value: 'Moderate', score: 5, description: 'The threat event could be expected to have a serious adverse effect — significant degradation of mission capability or significant harm to individuals.' },
-    { value: 'High', score: 8, description: 'The threat event could be expected to have a severe or catastrophic adverse effect — major damage to assets, major financial loss, or severe harm to individuals.' },
+    { value: 'Low', score: 2, description: 'The threat event could be expected to have a limited adverse effect - minor damage to assets, minor financial loss, or minor harm to individuals.' },
+    { value: 'Moderate', score: 5, description: 'The threat event could be expected to have a serious adverse effect - significant degradation of mission capability or significant harm to individuals.' },
+    { value: 'High', score: 8, description: 'The threat event could be expected to have a severe or catastrophic adverse effect - major damage to assets, major financial loss, or severe harm to individuals.' },
     { value: 'Very High', score: 10, description: 'The threat event could be expected to have multiple severe or catastrophic adverse effects on operations, assets, and individuals.' },
 ]
 
@@ -28,7 +28,7 @@ function getRiskLevel(likelihood, impact) {
         'Low':       { 'Very Low': 'Very Low', 'Low': 'Low', 'Moderate': 'Low', 'High': 'Low', 'Very High': 'Moderate' },
         'Very Low':  { 'Very Low': 'Very Low', 'Low': 'Very Low', 'Moderate': 'Very Low', 'High': 'Low', 'Very High': 'Low' },
     }
-    return table[likelihood]?.[impact] ?? '—'
+    return table[likelihood]?.[impact] ?? '-'
 }
 
 //Liste der Risk Sources
@@ -144,7 +144,7 @@ function Stepper({ currentStep, onStepClick }) {
                                 <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: isActive ? 'bold' : 'normal', color: isActive ? '#1a1a2e' : isDone ? '#4fc3f7' : '#999', textAlign: 'center', whiteSpace: 'nowrap' }}>
                                     {step.label}
                                 </div>
-                                <div style={{ fontSize: '10px', color: '#bbb', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontSize: '10px', color: '#6b7d94', textAlign: 'center', whiteSpace: 'nowrap' }}>
                                     {step.sub}
                                 </div>
                             </div>
@@ -399,7 +399,7 @@ function LandingPage({ onStart, onResume }) {
                 >
                     Start Assessment →
                 </button>
-                <p style={{ fontSize: '12px', color: '#666', marginTop: '16px' }}>
+                <p style={{ fontSize: '12px', color: '#8fa5c2', marginTop: '16px' }}>
                     Grounded in ISO 31000:2018 · ISO/IEC 23894:2023 · NIST SP 800-30 · NIST AI RMF 1.0
                 </p>
                 {/* Assessments Liste */}
@@ -420,7 +420,7 @@ function LandingPage({ onStart, onResume }) {
                                         <div style={{ fontSize: '13px', color: '#aaa', marginTop: '4px' }}>
                                             {a.ai_system.assessor_name} · {a.ai_system.date}
                                         </div>
-                                        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                                        <div style={{ fontSize: '12px', color: '#7a90ab', marginTop: '4px' }}>
                                             ID: {a.id}
                                         </div>
                                     </div>
@@ -430,7 +430,7 @@ function LandingPage({ onStart, onResume }) {
                                         </span>
                                         <button
                                             onClick={() => onResume(a)}
-                                            style={{ padding: '8px 16px', background: isComplete ? 'transparent' : '#4fc3f7', color: isComplete ? '#aaa' : '#1a1a2e', border: isComplete ? '1px solid #555' : 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                            style={{ padding: '8px 16px', background: isComplete ? 'transparent' : '#4fc3f7', color: isComplete ? '#4fc3f7' : '#1a1a2e', border: isComplete ? '1px solid #4fc3f7' : 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
                                         >
                                             {isComplete ? 'Review & Update →' : 'Resume →'}
                                         </button>
@@ -446,7 +446,7 @@ function LandingPage({ onStart, onResume }) {
 }
 
 function FieldHint({ text }) {
-    return <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 6px' }}>{text}</p>
+    return <p style={{ fontSize: '12px', color: '#5a5a5a', margin: '2px 0 6px' }}>{text}</p>
 }
 
 //Muss vom User ausgefüllt werden
@@ -642,8 +642,8 @@ function StepRiskIdentification({ scope, risks, setRisks, assessmentId, onBack, 
             <h1 style={styles.heading}>Risk Identification</h1>
             <p style={styles.sub}>
                 {scope.domain
-                    ? `Showing risks for domain "${scope.domain}" · stage "${scope.phase}" — ISO/IEC 23894 Annex B & C`
-                    : 'All catalog risks shown — no scope filter active.'}
+                    ? `Showing risks for domain "${scope.domain}" · stage "${scope.phase}" - ISO/IEC 23894 Annex B & C`
+                    : 'All catalog risks shown - no scope filter active.'}
             </p>
             <div style={{ ...styles.card, marginBottom: '16px', background: '#f0f7ff', border: '1px solid #b3d9f7' }}>
                 <p style={{ margin: 0, fontSize: '13px', color: '#1565c0' }}>
@@ -706,7 +706,7 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
     return (
         <div style={styles.page}>
             <h1 style={styles.heading}>Risk Evaluation</h1>
-            <p style={styles.sub}>Assess Likelihood and Impact for each identified risk — NIST SP 800-30 Tables G-3, H-3, I-2</p>
+            <p style={styles.sub}>Assess Likelihood and Impact for each identified risk - NIST SP 800-30 Tables G-3, H-3, I-2</p>
 
             {risks.map(risk => {
                 const c = levelColor(risk.level)
@@ -753,6 +753,15 @@ const ISO_TREATMENT_OPTIONS = [
     'Share the risk',
     'Retain the risk by informed decision',
 ]
+
+const TREATMENT_OPTION_EXPLANATIONS= {
+    'Avoid the risk': 'Deciding not to start or continue with the activity that gives rise to the risk.',
+    'Remove risk source': 'Eliminating the actual origin of the risk rather than just softening its effects - e.g. removing a biased data source or a faulty model component.',
+    'Change likelihood': 'Taking measures that reduce the probability of the risk occurring, without eliminating its source.',
+    'Change consequences': 'Reducing the severity of impact if the risk materializes, e.g. through safeguards or fallback mechanisms.',
+    'Share the risk': 'Transferring part of the risk to another party, e.g. through contracts or insurance.',
+    'Retain the risk by informed decision': 'Knowingly accepting the risk as-is, based on an informed trade-off between benefit and risk.',
+}
 
 function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
 
@@ -858,7 +867,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
             <div style={{ ...styles.card, marginBottom: '24px', background: allGreen ? '#e8f5e9' : '#fff3e0', border: `1px solid ${allGreen ? '#2e7d32' : '#e65100'}` }}>
                 <p style={{ margin: 0, fontWeight: 'bold', color: allGreen ? '#2e7d32' : '#e65100' }}>
                     {allGreen
-                        ? '🟢 All risks treated — you may proceed to the Report.'
+                        ? '🟢 All risks treated - you may proceed to the Report.'
                         : `🟡 ${risks.filter(r => r.treatmentStatus !== 'confirmed').length} risk(s) still require treatment before you can proceed.`}
                 </p>
             </div>
@@ -957,6 +966,9 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
                                         <option value="">- Select Treatment Option -</option>
                                         {ISO_TREATMENT_OPTIONS.map(o => <option key={o}>{o}</option>)}
                                     </select>
+                                    {risk.treatmentOption && (
+                                        <FieldHint text={TREATMENT_OPTION_EXPLANATIONS[risk.treatmentOption]} />
+                                    )}
                                     <label style={styles.label}>Treatment Description <span style={{ color: '#c62828' }}>*</span></label>
                                     <textarea
                                         style={{ ...styles.input, height: '70px', resize: 'vertical' }}
@@ -1126,8 +1138,8 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack }) {
         doc.text(`Assessor: ${user.assessorName} (${user.role})`, 20, y); y += 6
         doc.text(`AI System: ${user.aiSystemName}`, 20, y); y += 6
         doc.text(`Date: ${user.date}`, 20, y); y += 6
-        doc.text(`Domain: ${scope.domain || '—'}`, 20, y); y += 6
-        doc.text(`Lifecycle Stage: ${scope.phase || '—'}`, 20, y); y += 6
+        doc.text(`Domain: ${scope.domain || '-'}`, 20, y); y += 6
+        doc.text(`Lifecycle Stage: ${scope.phase || '-'}`, 20, y); y += 6
         doc.text(`Assessment ID: ${assessmentId}`, 20, y); y += 6
         doc.text(`Report generated: ${new Date().toISOString().split('T')[0]}`, 20, y); y += 6
         doc.text(`Likelihood Scale: NIST SP 800-30 Table G-3`, 20, y); y += 6
@@ -1150,7 +1162,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack }) {
             doc.setFont('helvetica', 'normal')
             doc.text(`   Risk Level: ${r.level} | Likelihood: ${r.likelihood} | Impact: ${r.impact}`, 20, y); y += 5
             if (r.treatmentOption) {
-                doc.text(`   Treatment: ${r.treatmentOption} — ${r.treatmentNote}`, 20, y, { maxWidth: 165 }); y += 8
+                doc.text(`   Treatment: ${r.treatmentOption} - ${r.treatmentNote}`, 20, y, { maxWidth: 165 }); y += 8
                 doc.text(`   Residual Risk: ${r.residualLevel}`, 20, y); y += 8
             } else {
                 y += 4
@@ -1216,8 +1228,8 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack }) {
                 <p><strong>Assessor:</strong> {user.assessorName} ({user.role})</p>
                 <p><strong>AI System:</strong> {user.aiSystemName}</p>
                 <p><strong>Date:</strong> {user.date}</p>
-                <p><strong>Domain:</strong> {scope.domain || '—'}</p>
-                <p><strong>Lifecycle Stage:</strong> {scope.phase || '—'}</p>
+                <p><strong>Domain:</strong> {scope.domain || '-'}</p>
+                <p><strong>Lifecycle Stage:</strong> {scope.phase || '-'}</p>
                 <p><strong>Likelihood Scale:</strong> NIST SP 800-30 Table G-3</p>
                 <p><strong>Impact Scale:</strong> NIST SP 800-30 Table H-3</p>
                 <p><strong>Risk Combination:</strong> NIST SP 800-30 Table I-2</p>
