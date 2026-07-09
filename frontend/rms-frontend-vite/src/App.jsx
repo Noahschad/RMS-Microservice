@@ -494,9 +494,11 @@ function UserForm({ onBegin }) {
 }
 
 //Scope & Criteria Seite
-function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impactScale, setImpactScale, assessmentId, onNext }) {
+function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impactScale, setImpactScale, assessmentId, previousPhase, onNext }) {
     const [form, setForm] = useState(scope)
     const isValid = form.domain && form.phase
+    const isReassessment = !!previousPhase
+    const phaseUnchanged = isReassessment && form.phase === previousPhase
 
     async function save() {
         setScope(form)
@@ -522,26 +524,67 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
             <h1 style={styles.heading}>Scope & Criteria</h1>
             <p style={styles.sub}>Define the context of the AI system under assessment - ISO 31000 Cl. 6.3 · ISO/IEC 23894 Cl. 6.3</p>
 
+            {isReassessment && (
+                <div style={{ ...styles.card, marginBottom: '16px', background: '#fff8e1', border: '1px solid #f9a825' }}>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#8d6e00' }}>
+                        <strong>Re-assessment detected.</strong> This AI system was last assessed at lifecycle stage "<strong>{previousPhase}</strong>".
+                        The Domain typically stays the same across re-assessments of the same system - please check below whether the
+                        <strong> Lifecycle Stage</strong> needs to be updated to reflect progress.
+                    </p>
+                </div>
+            )}
+
             <div style={styles.card}>
                 <h3 style={{ marginTop: 0 }}>AI System Context</h3>
-                <div style={styles.formGrid}>
-                    <div>
-                        <label style={styles.label}>Deployment Domain</label>
-                        <FieldHint text="Filters the risk catalog to risks relevant to your sector." />
-                        <select style={styles.input} value={form.domain} onChange={e => setForm({ ...form, domain: e.target.value })}>
-                            <option value="">- Select Domain -</option>
-                            {DOMAINS.map(d => <option key={d}>{d}</option>)}
-                        </select>
+                <label style={styles.label}>Deployment Domain</label>
+                <FieldHint text="Filters the risk catalog to risks relevant to your sector. Usually unchanged across re-assessments of the same system." />
+                <select style={styles.input} value={form.domain} onChange={e => setForm({ ...form, domain: e.target.value })}>
+                    <option value="">- Select Domain -</option>
+                    {DOMAINS.map(d => <option key={d}>{d}</option>)}
+                </select>
+            </div>
+
+            <div style={{
+                ...styles.card,
+                marginTop: '16px',
+                border: `3px solid ${phaseUnchanged ? '#f9a825' : COLORS.accent}`,
+                background: COLORS.cardBg,
+                boxShadow: `0 0 0 4px ${phaseUnchanged ? 'rgba(249,168,37,0.12)' : 'rgba(79,195,247,0.12)'}`,
+            }}>
+                {isReassessment && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '2px' }}>
+                        <span style={{
+                            fontSize: '11px', fontWeight: 'bold', color: 'white', background: COLORS.accent,
+                            padding: '3px 10px', borderRadius: '20px', letterSpacing: '0.5px',
+                        }}>
+                            CHANGES AS SYSTEM PROGRESSES
+                        </span>
                     </div>
-                    <div>
-                        <label style={styles.label}>Lifecycle Stage (ISO/IEC 23894 Annex C)</label>
-                        <FieldHint text="The current phase of your AI system - affects which risks are shown." />
-                        <select style={styles.input} value={form.phase} onChange={e => setForm({ ...form, phase: e.target.value })}>
-                            <option value="">- Select Phase -</option>
-                            {PHASES.map(p => <option key={p}>{p}</option>)}
-                        </select>
-                    </div>
-                </div>
+                )}
+                <label style={{ ...styles.label, fontSize: '15px', fontWeight: 'bold', color: COLORS.navy, marginTop: '8px' }}>
+                    Lifecycle Stage
+                </label>
+                <FieldHint text="The Domain above usually stays the same across re-assessments - this is the field that changes as your AI system moves forward in its lifecycle (ISO/IEC 23894 Annex C)." />
+                <select
+                    style={{ ...styles.input, borderColor: phaseUnchanged ? '#f9a825' : COLORS.accent }}
+                    value={form.phase}
+                    onChange={e => setForm({ ...form, phase: e.target.value })}
+                >
+                    <option value="">- Select Phase -</option>
+                    {PHASES.map(p => <option key={p}>{p}</option>)}
+                </select>
+
+                {isReassessment && (
+                    phaseUnchanged ? (
+                        <p style={{ margin: '10px 0 0', fontSize: '13px', color: '#8d6e00', fontWeight: 'bold' }}>
+                            Still set to the same stage as last time ("{previousPhase}"). If the system has progressed, please update it.
+                        </p>
+                    ) : (
+                        <p style={{ margin: '10px 0 0', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
+                            ✓ Updated from "{previousPhase}" to "{form.phase}".
+                        </p>
+                    )
+                )}
             </div>
 
             <EditableScaleTable scale={likelihoodScale} setScale={setLikelihoodScale} title="Likelihood Scale" source="NIST SP 800-30 Table G-3" note="Used to assess the likelihood of each identified risk. Definitions can be adapted to organisational context." />
@@ -1243,7 +1286,7 @@ export default function App() {
     const [impactScale, setImpactScale] = useState(DEFAULT_IMPACT_SCALE)
     const [misueModalOpen, setMisuseModalOpen] = useState(false)
     const [assessmentId, setAssessmentId] = useState(null)
-
+    const [previousPhase, setPreviousPhase] = useState(null)
 
     //Neues assessment anlegen
     async function handleBegin(formData) {
@@ -1289,13 +1332,14 @@ export default function App() {
         if (assessment.likelihood_scale?.length) setLikelihoodScale(assessment.likelihood_scale)
         if (assessment.impact_scale?.length) setImpactScale(assessment.impact_scale)
         setAssessmentId(assessment.id)
+        setPreviousPhase(assessment.status === 'completed' ? assessment.scope.phase : null)
         setCurrentStep(assessment.status === 'completed' ? 1 : (assessment.current_step || 1))
         setScreen('steps')
     }
 
     function renderStep() {
         switch (currentStep) {
-            case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} assessmentId={assessmentId} onNext={() => setCurrentStep(2)} />
+            case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} assessmentId={assessmentId} previousPhase={previousPhase} onNext={() => setCurrentStep(2)} />
             case 2: return <StepRiskIdentification scope={scope} risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)} />
             case 3: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)} />
             case 4: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} />
@@ -1313,6 +1357,7 @@ export default function App() {
         setLikelihoodScale(DEFAULT_LIKELIHOOD_SCALE)
         setImpactScale(DEFAULT_IMPACT_SCALE)
         setAssessmentId(null)
+        setPreviousPhase(null)
         setCurrentStep(1)
         setScreen('form')
     }
