@@ -436,7 +436,7 @@ function LandingPage({ onStart, onResume }) {
                                                 : pending.join(', ')
                                             return (
                                                 <div style={{ fontSize: '11px', color: '#8fa5c2', textAlign: 'right', maxWidth: '260px', lineHeight: 1.5 }}>
-                                                    Stage: <strong style={{ color: '#4fc3f7' }}>{a.scope?.phase || '—'}</strong>
+                                                    Stage: <strong style={{ color: '#4fc3f7' }}>{a.scope?.phase || '-'}</strong>
                                                     {pending.length > 0 ? (
                                                         <div>Pending: {pendingLabel}</div>
                                                     ) : (
@@ -455,6 +455,147 @@ function LandingPage({ onStart, onResume }) {
                                 </div>
                             )
                         })}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+//Accuracy interpretieren
+function interpretAccuracy(accuracy) {
+    const chanceLevelNote = accuracy <= 0.5 ? " That's around chance level for a yes/no decision." : ""
+    return `${Math.round(accuracy * 100)}% of decisions matched the ground truth in this small test.${chanceLevelNote} There's no fixed accuracy number required by law for this - it is something we define and justify ourselves for this project.`
+}
+
+//Fairness interpretieren
+function interpretFairness(cf) {
+    const threshold = 0.1
+    if (cf <= threshold) {
+        return `At or below ${threshold} (the threshold demonstrated for this metric family in IEEE Std 3198-2025, Cl. 7.3.1), meaning the fairness requirement would be considered met in that reference example - though n=5 pairs is a small sample.`
+    }
+    const multiple = (cf / threshold).toFixed(1)
+    return `Above the ${threshold} threshold demonstrated in IEEE Std 3198-2025 (Cl. 7.3.1) for this metric family - about ${multiple}x that reference value. In that worked example, exceeding this threshold means the fairness requirement is not met.`
+}
+
+//Precision interpretieren
+function interpretPrecision(precision) {
+    const pct = Math.round(precision * 100)
+    return `Of all applicants the model approved, ${pct}% actually should have been approved according to ground truth.`
+}
+
+//Recall interpretieren
+function interpretRecall(recall) {
+    const pct = Math.round(recall * 100)
+    return `Of all applicants who should have been approved, the model correctly approved ${pct}% of them. Aji & Dhini (2019) highlight this kind of measure as more important than plain Accuracy in credit scoring.`
+}
+
+//Specificity interpretieren
+function interpretSpecificity(specificity) {
+    const pct = Math.round(specificity * 100)
+    return `Of all applicants who should have been rejected, the model correctly rejected ${pct}% of them.`
+}
+
+//F1 interpretieren
+function interpretF1(f1) {
+    const pct = Math.round(f1 * 100)
+    return `F1 combines Precision and Recall into one score (${pct}%).`
+}
+
+function AIModelCheckPanel({ modelCheckResult, occlusionResult, onClose }) {
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end' }}>
+            <div style={{ background: 'white', width: '640px', maxWidth: '90vw', height: '100vh', overflowY: 'auto', padding: '32px', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <h2 style={{ margin: 0, fontSize: '20px' }}>AI Model Check Details</h2>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#666' }}>✕</button>
+                </div>
+                <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>
+                    Results from the last run in Risk Identification. Go back there to re-run the check.
+                </p>
+
+                {!modelCheckResult && !occlusionResult && (
+                    <p style={{ color: '#aaa', fontSize: '13px', textAlign: 'center', marginTop: '40px' }}>
+                        No AI model check has been run yet.
+                    </p>
+                )}
+
+                {modelCheckResult && (
+                    <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                            <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Accuracy</div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{Math.round(modelCheckResult.accuracy * 100)}%</div>
+                                <p style={{ fontSize: '12px', color: '#5a5a5a', marginTop: '8px' }}>{interpretAccuracy(modelCheckResult.accuracy)}</p>
+                            </div>
+                            <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Counterfactual Fairness</div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: modelCheckResult.counterfactual_fairness > 0.1 ? '#c62828' : '#2e7d32' }}>{modelCheckResult.counterfactual_fairness}</div>
+                                <p style={{ fontSize: '12px', color: '#5a5a5a', marginTop: '8px' }}>{interpretFairness(modelCheckResult.counterfactual_fairness)}</p>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                            {modelCheckResult.precision !== null && (
+                                <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                                    <div style={{ fontSize: '11px', color: '#5a5a5a' }}>Precision</div>
+                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{modelCheckResult.precision}</div>
+                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretPrecision(modelCheckResult.precision)}</p>
+                                </div>
+                            )}
+                            {modelCheckResult.recall !== null && (
+                                <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                                    <div style={{ fontSize: '11px', color: '#5a5a5a' }}>Recall</div>
+                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{modelCheckResult.recall}</div>
+                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretRecall(modelCheckResult.recall)}</p>
+                                </div>
+                            )}
+                            {modelCheckResult.specificity !== null && (
+                                <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                                    <div style={{ fontSize: '11px', color: '#5a5a5a' }}>Specificity</div>
+                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{modelCheckResult.specificity}</div>
+                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretSpecificity(modelCheckResult.specificity)}</p>
+                                </div>
+                            )}
+                            {modelCheckResult.f1_score !== null && (
+                                <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                                    <div style={{ fontSize: '11px', color: '#5a5a5a' }}>F1-Score</div>
+                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{modelCheckResult.f1_score}</div>
+                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretF1(modelCheckResult.f1_score)}</p>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {occlusionResult && (
+                    <div>
+                        <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Occlusion (Applicant #{occlusionResult.applicant_id})</h3>
+                        <p style={{ fontSize: '13px', marginBottom: '10px' }}>
+                            Baseline decision: <strong>{occlusionResult.baseline_decision}</strong>
+                        </p>
+                        <table style={styles.table}>
+                            <thead>
+                            <tr>
+                                <th style={styles.th}>Field removed</th>
+                                <th style={styles.th}>Decision</th>
+                                <th style={styles.th}>Changed?</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {occlusionResult.occlusion_results.map(r => (
+                                <tr key={r.omitted_field}>
+                                    <td style={styles.td}>{r.omitted_field}</td>
+                                    <td style={styles.td}>{r.decision_without_field}</td>
+                                    <td style={styles.td}>
+                                        {r.changed_from_baseline
+                                            ? <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes</span>
+                                            : <span style={{ color: '#999' }}>No</span>}
+                                    </td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </div>
@@ -613,7 +754,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
 }
 
 //Risiken hinzufügen
-function StepRiskIdentification({ scope, risks, setRisks, assessmentId, onBack, onNext }) {
+function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, onNext, modelCheckLoading, modelCheckResult, modelCheckError, runModelCheck, occlusionApplicantId, setOcclusionApplicantId, occlusionLoading, occlusionResult, occlusionError, runOcclusionTest,}) {
     const filtered = RISK_CATALOG.filter(r =>
         (!scope.domain || r.domains.includes(scope.domain)) &&
         (!scope.phase || r.phases.includes(scope.phase))
@@ -668,6 +809,188 @@ function StepRiskIdentification({ scope, risks, setRisks, assessmentId, onBack, 
                 </p>
             </div>
 
+            <div style={{ ...styles.card, marginBottom: '16px', background: '#f0f7ff', border: '1px solid #b3d9f7' }}>
+                <h3 style={{ marginTop: 0, fontSize: '15px' }}>AI Model Technical Check</h3>
+                <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
+                    Runs the connected AI system (Gemma-3-1B via Ollama) against a small test set of credit applications
+                    to measure Accuracy and Counterfactual Fairness. Run this before
+                    selecting risks below, so the selection can be informed by the technical evidence.
+                </p>
+                <button
+                    onClick={runModelCheck}
+                    disabled={modelCheckLoading}
+                    style={{ ...styles.button, marginTop: 0, opacity: modelCheckLoading ? 0.6 : 1, cursor: modelCheckLoading ? 'not-allowed' : 'pointer' }}
+                >
+                    {modelCheckLoading ? 'Running Test...' : 'Run AI Model Check'}
+                </button>
+
+                {modelCheckError && (
+                    <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#c62828' }}>{modelCheckError}</p>
+                    </div>
+                )}
+
+                {modelCheckResult && (
+                    <div style={{ marginTop: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: '180px', padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
+                            <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Accuracy</div>
+                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e' }}>
+                                {Math.round(modelCheckResult.accuracy * 100)}%
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#999', marginBottom: '8px' }}>
+                                over {modelCheckResult.sample_size} test applicants
+                            </div>
+                            <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
+                                {interpretAccuracy(modelCheckResult.accuracy)}
+                            </p>
+                        </div>
+                        <div style={{ flex: 1, minWidth: '180px', padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
+                            <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Counterfactual Fairness</div>
+                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: modelCheckResult.counterfactual_fairness > 0.1 ? '#c62828' : '#2e7d32' }}>
+                                {modelCheckResult.counterfactual_fairness}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#999', marginBottom: '8px' }}>
+                                share of paired applicants (identical data, different gender) whose decision flipped
+                            </div>
+                            <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
+                                {interpretFairness(modelCheckResult.counterfactual_fairness)}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {modelCheckResult && (
+                    <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                        {modelCheckResult.precision !== null && (
+                            <div style={{ padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
+                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Precision</div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>
+                                    {modelCheckResult.precision}
+                                </div>
+                                <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
+                                    {interpretPrecision(modelCheckResult.precision)}
+                                </p>
+                            </div>
+                        )}
+                        {modelCheckResult.recall !== null && (
+                            <div style={{ padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
+                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Recall</div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>
+                                    {modelCheckResult.recall}
+                                </div>
+                                <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
+                                    {interpretRecall(modelCheckResult.recall)}
+                                </p>
+                            </div>
+                        )}
+                        {modelCheckResult.specificity !== null && (
+                            <div style={{ padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
+                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Specificity</div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>
+                                    {modelCheckResult.specificity}
+                                </div>
+                                <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
+                                    {interpretSpecificity(modelCheckResult.specificity)}
+                                </p>
+                            </div>
+                        )}
+                        {modelCheckResult.f1_score !== null && (
+                            <div style={{ padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
+                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>F1-Score</div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>
+                                    {modelCheckResult.f1_score}
+                                </div>
+                                <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
+                                    {interpretF1(modelCheckResult.f1_score)}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {modelCheckResult && modelCheckResult.unclear_count > 0 && (
+                    <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px' }}>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
+                            {modelCheckResult.unclear_count} response(s) could not be clearly classified as "approved" or "rejected"
+                            and were excluded from Precision/Recall/Specificity/F1.
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            <div style={{ ...styles.card, marginBottom: '16px', background: '#f0f7ff', border: '1px solid #b3d9f7' }}>
+                <h3 style={{ marginTop: 0, fontSize: '15px' }}>AI Model Explainability Check (Occlusion)</h3>
+                <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
+                    Removes one input field at a time from a single test applicant to see which features actually
+                    influence the model's decision.
+                </p>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px' }}>
+                    <label style={{ ...styles.label, marginBottom: 0 }}>Test applicant:</label>
+                    <select
+                        style={{ ...styles.input, width: '80px' }}
+                        value={occlusionApplicantId}
+                        onChange={e => setOcclusionApplicantId(Number(e.target.value))}
+                    >
+                        {Array.from({ length: 10 }, (_, i) => i + 1).map(id => (
+                            <option key={id} value={id}>#{id}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={runOcclusionTest}
+                        disabled={occlusionLoading}
+                        style={{ ...styles.button, marginTop: 0, opacity: occlusionLoading ? 0.6 : 1, cursor: occlusionLoading ? 'not-allowed' : 'pointer' }}
+                    >
+                        {occlusionLoading ? 'Running Test...' : 'Run Occlusion Test'}
+                    </button>
+                </div>
+
+                {occlusionError && (
+                    <div style={{ padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#c62828' }}>{occlusionError}</p>
+                    </div>
+                )}
+
+                {occlusionResult && (
+                    <div style={{ marginTop: '12px' }}>
+                        <p style={{ fontSize: '13px', marginBottom: '10px' }}>
+                            Baseline decision (all fields present): <strong>{occlusionResult.baseline_decision}</strong>
+                        </p>
+                        <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
+                            {(() => {
+                                const influential = occlusionResult.occlusion_results.filter(r => r.changed_from_baseline).map(r => r.omitted_field)
+                                return influential.length === 0
+                                    ? "No single field changed the decision when removed - the model's decision appears to rely on the combination of all fields together, or is not clearly sensitive to any one feature in this test."
+                                    : `The decision changed when removing: ${influential.join(', ')}. This suggests these fields carry the most weight in this specific case - worth checking whether that matches what a credit officer should actually prioritize.`
+                            })()}
+                        </p>
+                        <table style={styles.table}>
+                            <thead>
+                            <tr>
+                                <th style={styles.th}>Field removed</th>
+                                <th style={styles.th}>Decision without it</th>
+                                <th style={styles.th}>Changed the outcome?</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {occlusionResult.occlusion_results.map(r => (
+                                <tr key={r.omitted_field}>
+                                    <td style={styles.td}>{r.omitted_field}</td>
+                                    <td style={styles.td}>{r.decision_without_field}</td>
+                                    <td style={styles.td}>
+                                        {r.changed_from_baseline ? (
+                                            <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes - influential</span>
+                                        ) : (
+                                            <span style={{ color: '#999' }}>No</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
             {filtered.length === 0 && <div style={styles.card}><p>No risks found for the selected context. Please adjust your scope.</p></div>}
 
             {filtered.map(risk => {
@@ -694,7 +1017,7 @@ function StepRiskIdentification({ scope, risks, setRisks, assessmentId, onBack, 
 }
 
 //Risk level Berechnung
-function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, assessmentId, onBack, onNext }) {
+function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel }) {
     function update(id, field, value) {
         setRisks(risks.map(r => {
             if (r.id !== id) return r
@@ -724,6 +1047,15 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
         <div style={styles.page}>
             <h1 style={styles.heading}>Risk Evaluation</h1>
             <p style={styles.sub}>Assess Likelihood and Impact for each identified risk - NIST SP 800-30 Tables G-3, H-3, I-2</p>
+
+            {(modelCheckResult || occlusionResult) && (
+                <button
+                    onClick={onOpenModelCheckPanel}
+                    style={{ ...styles.buttonOutline, marginBottom: '16px', display: 'block' }}
+                >
+                    View AI Model Check Results
+                </button>
+            )}
 
             {risks.map(risk => {
                 const c = levelColor(risk.level)
@@ -780,8 +1112,7 @@ const TREATMENT_OPTION_EXPLANATIONS= {
     'Retain the risk by informed decision': 'Knowingly accepting the risk as-is, based on an informed trade-off between benefit and risk.',
 }
 
-function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
-
+function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel }) {
     const [simulating, setSimulating] = useState(null) // speichert die ID des Risikos das gerade simuliert wird
     const [simDone, setSimDone] = useState({}) // speichert welche Simulationen bereits abgeschlossen sind
 
@@ -879,6 +1210,15 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext }) {
         <div style={styles.page}>
             <h1 style={styles.heading}>Risk Treatment</h1>
             <p style={styles.sub}>Define and confirm mitigation measures - ISO 31000 Cl. 6.5</p>
+
+            {(modelCheckResult || occlusionResult) && (
+                <button
+                    onClick={onOpenModelCheckPanel}
+                    style={{ ...styles.buttonOutline, marginBottom: '16px', display: 'block' }}
+                >
+                    View AI Model Check Results
+                </button>
+            )}
 
             {/* Ampel Übersicht */}
             <div style={{ ...styles.card, marginBottom: '24px', background: allGreen ? '#e8f5e9' : '#fff3e0', border: `1px solid ${allGreen ? '#2e7d32' : '#e65100'}` }}>
@@ -1314,8 +1654,50 @@ export default function App() {
     const [likelihoodScale, setLikelihoodScale] = useState(DEFAULT_LIKELIHOOD_SCALE)
     const [impactScale, setImpactScale] = useState(DEFAULT_IMPACT_SCALE)
     const [misueModalOpen, setMisuseModalOpen] = useState(false)
+    const [modelCheckPanelOpen, setModelCheckPanelOpen] = useState(false)
+
     const [assessmentId, setAssessmentId] = useState(null)
     const [previousPhase, setPreviousPhase] = useState(null)
+
+    const [modelCheckLoading, setModelCheckLoading] = useState(false)
+    const [modelCheckResult, setModelCheckResult] = useState(null)
+    const [modelCheckError, setModelCheckError] = useState(null)
+
+    const [occlusionApplicantId, setOcclusionApplicantId] = useState(9)
+    const [occlusionLoading, setOcclusionLoading] = useState(false)
+    const [occlusionResult, setOcclusionResult] = useState(null)
+    const [occlusionError, setOcclusionError] = useState(null)
+
+    async function runModelCheck() {
+        setModelCheckLoading(true)
+        setModelCheckError(null)
+        try {
+            const response = await fetch('http://127.0.0.1:8000/credit-metrics')
+            if (!response.ok) throw new Error('Backend returned an error')
+            const data = await response.json()
+            setModelCheckResult(data)
+        } catch (error) {
+            console.error('Model check failed:', error)
+            setModelCheckError('Could not reach the AI model. Is the backend and Ollama running?')
+        }
+        setModelCheckLoading(false)
+    }
+
+    async function runOcclusionTest() {
+        setOcclusionLoading(true)
+        setOcclusionError(null)
+        setOcclusionResult(null)
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/occlusion-test/${occlusionApplicantId}`)
+            if (!response.ok) throw new Error('Backend returned an error')
+            const data = await response.json()
+            setOcclusionResult(data)
+        } catch (error) {
+            console.error('Occlusion test failed:', error)
+            setOcclusionError('Could not reach the AI model. Is the backend and Ollama running?')
+        }
+        setOcclusionLoading(false)
+    }
 
     //Neues assessment anlegen
     async function handleBegin(formData) {
@@ -1370,9 +1752,15 @@ export default function App() {
     function renderStep() {
         switch (currentStep) {
             case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} assessmentId={assessmentId} previousPhase={previousPhase} onNext={() => setCurrentStep(2)} />
-            case 2: return <StepRiskIdentification scope={scope} risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)} />
-            case 3: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)} />
-            case 4: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} />
+            case 2: return <StepRiskIdentification
+                scope={scope} risks={risks} setRisks={setRisks} assessmentId={assessmentId}
+                onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)}
+                modelCheckLoading={modelCheckLoading} modelCheckResult={modelCheckResult} modelCheckError={modelCheckError} runModelCheck={runModelCheck}
+                occlusionApplicantId={occlusionApplicantId} setOcclusionApplicantId={setOcclusionApplicantId}
+                occlusionLoading={occlusionLoading} occlusionResult={occlusionResult} occlusionError={occlusionError} runOcclusionTest={runOcclusionTest}
+            />
+            case 3: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} />
+            case 4: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} />
             case 5: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} onFinish={() => setScreen('landing')} />
             default: return null
         }
@@ -1388,6 +1776,10 @@ export default function App() {
         setImpactScale(DEFAULT_IMPACT_SCALE)
         setAssessmentId(null)
         setPreviousPhase(null)
+        setModelCheckResult(null)
+        setModelCheckError(null)
+        setOcclusionResult(null)
+        setOcclusionError(null)
         setCurrentStep(1)
         setScreen('form')
     }
@@ -1430,6 +1822,13 @@ export default function App() {
                     likelihoodScale={likelihoodScale}
                     impactScale={impactScale}
                     onClose={() => setMisuseModalOpen(false)}
+                />
+            )}
+            {modelCheckPanelOpen && (
+                <AIModelCheckPanel
+                    modelCheckResult={modelCheckResult}
+                    occlusionResult={occlusionResult}
+                    onClose={() => setModelCheckPanelOpen(false)}
                 />
             )}
         </div>

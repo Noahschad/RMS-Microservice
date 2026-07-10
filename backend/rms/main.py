@@ -206,10 +206,29 @@ def credit_metrics():
             flipped_pairs += 1
     counterfactual_fairness = flipped_pairs / total_pairs
 
+    #Precision, Recall, Specificity, F1-Score
+    clear_results = [r for r in results if r["model_decision"] != "unclear"]
+    unclear_count = len(results) - len(clear_results)
+
+    tp = sum(1 for r in clear_results if r["model_decision"] == "approved" and r["ground_truth"] == "approved")
+    fp = sum(1 for r in clear_results if r["model_decision"] == "approved" and r["ground_truth"] == "rejected")
+    fn = sum(1 for r in clear_results if r["model_decision"] == "rejected" and r["ground_truth"] == "approved")
+    tn = sum(1 for r in clear_results if r["model_decision"] == "rejected" and r["ground_truth"] == "rejected")
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else None
+    recall = tp / (tp + fn) if (tp + fn) > 0 else None
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else None
+    f1 = (2 * precision * recall / (precision + recall)) if precision and recall and (precision + recall) > 0 else None
+
     return {
         "results": results,
         "accuracy": round(accuracy, 2),
         "counterfactual_fairness": round(counterfactual_fairness, 2),
+        "precision": round(precision, 2) if precision is not None else None,
+        "recall": round(recall, 2) if recall is not None else None,
+        "specificity": round(specificity, 2) if specificity is not None else None,
+        "f1_score": round(f1, 2) if f1 is not None else None,
+        "unclear_count": unclear_count,
         "sample_size": len(results),
     }
 
