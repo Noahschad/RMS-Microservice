@@ -69,17 +69,8 @@ const MISUSE_CATEGORIES = [
     'Psychological manipulation',
 ]
 
-//Automatisierter Vorschlage für Risk Treatment von "Biased Training Data" und "Discriminatory decisions"
+//Automatisierter Vorschlage für Risk Treatment von "Discriminatory decisions"
 const TREATMENT_SUGGESTIONS = {
-    1: {
-        option: 'Remove risk source',
-        note: 'Apply dataset rebalancing and bias audit before deployment. Validate demographic parity across all affected groups.',
-        hasSimulation: true,
-        simulationButton: 'Run Bias Audit & Rebalance Dataset',
-        simulationResult: 'Bias audit complete. Underrepresented groups rebalanced. Dataset fairness score: 94%',
-        simulationResidualLikelihood: 'Low',
-        simulationResidualImpact: 'Low',
-    },
     10: {
         option: 'Remove risk source',
         note: 'Apply fairness constraints during training and conduct regular disparate impact audits post-deployment.',
@@ -548,7 +539,10 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
     return null
 }
 
-function AIModelCheckPanel({ modelCheckResult, occlusionResult, onClose }) {
+function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult, onClose }) {
+    const [showMitigated, setShowMitigated] = useState(false)
+    const displayedResult = showMitigated && mitigatedResult ? mitigatedResult : modelCheckResult
+
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'stretch', justifyContent: 'flex-end' }}>
             <div style={{ background: 'white', width: '640px', maxWidth: '90vw', height: '100%', boxSizing: 'border-box', overflowY: 'auto', padding: '32px', paddingBottom: '80px', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)' }}>
@@ -557,8 +551,35 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, onClose }) {
                     <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#666' }}>✕</button>
                 </div>
                 <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>
-                    Results from the last run in Risk Identification. Go back there to re-run the check.
+                    {showMitigated
+                        ? 'Results after re-running the test with gender removed (Fairness through Unawareness).'
+                        : 'Original results from the last run in Risk Identification.'}
                 </p>
+
+                {mitigatedResult && (
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                        <button
+                            onClick={() => setShowMitigated(false)}
+                            style={{
+                                ...styles.buttonOutline, marginTop: 0, fontSize: '12px',
+                                background: !showMitigated ? '#1a1a2e' : 'white',
+                                color: !showMitigated ? 'white' : '#1a1a2e',
+                            }}
+                        >
+                            ← Original Results
+                        </button>
+                        <button
+                            onClick={() => setShowMitigated(true)}
+                            style={{
+                                ...styles.buttonOutline, marginTop: 0, fontSize: '12px',
+                                background: showMitigated ? '#1a1a2e' : 'white',
+                                color: showMitigated ? 'white' : '#1a1a2e',
+                            }}
+                        >
+                            After Mitigation →
+                        </button>
+                    </div>
+                )}
 
                 {!modelCheckResult && !occlusionResult && (
                     <p style={{ color: '#aaa', fontSize: '13px', textAlign: 'center', marginTop: '40px' }}>
@@ -566,48 +587,48 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, onClose }) {
                     </p>
                 )}
 
-                {modelCheckResult && (
+                {displayedResult && (
                     <>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                             <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                                 <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Accuracy</div>
-                                <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{Math.round(modelCheckResult.accuracy * 100)}%</div>
-                                <p style={{ fontSize: '12px', color: '#5a5a5a', marginTop: '8px' }}>{interpretAccuracy(modelCheckResult.accuracy)}</p>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{Math.round(displayedResult.accuracy * 100)}%</div>
+                                <p style={{ fontSize: '12px', color: '#5a5a5a', marginTop: '8px' }}>{interpretAccuracy(displayedResult.accuracy)}</p>
                             </div>
                             <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                                 <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Counterfactual Fairness</div>
-                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: modelCheckResult.counterfactual_fairness > 0.1 ? '#c62828' : '#2e7d32' }}>{modelCheckResult.counterfactual_fairness}</div>
-                                <p style={{ fontSize: '12px', color: '#5a5a5a', marginTop: '8px' }}>{interpretFairness(modelCheckResult.counterfactual_fairness)}</p>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: displayedResult.counterfactual_fairness > 0.1 ? '#c62828' : '#2e7d32' }}>{displayedResult.counterfactual_fairness}</div>
+                                <p style={{ fontSize: '12px', color: '#5a5a5a', marginTop: '8px' }}>{interpretFairness(displayedResult.counterfactual_fairness)}</p>
                             </div>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '20px' }}>
-                            {modelCheckResult.precision !== null && (
+                            {displayedResult.precision !== null && (
                                 <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                                     <div style={{ fontSize: '11px', color: '#5a5a5a' }}>Precision</div>
-                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{modelCheckResult.precision}</div>
-                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretPrecision(modelCheckResult.precision)}</p>
+                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{displayedResult.precision}</div>
+                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretPrecision(displayedResult.precision)}</p>
                                 </div>
                             )}
-                            {modelCheckResult.recall !== null && (
+                            {displayedResult.recall !== null && (
                                 <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                                     <div style={{ fontSize: '11px', color: '#5a5a5a' }}>Recall</div>
-                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{modelCheckResult.recall}</div>
-                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretRecall(modelCheckResult.recall)}</p>
+                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{displayedResult.recall}</div>
+                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretRecall(displayedResult.recall)}</p>
                                 </div>
                             )}
-                            {modelCheckResult.specificity !== null && (
+                            {displayedResult.specificity !== null && (
                                 <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                                     <div style={{ fontSize: '11px', color: '#5a5a5a' }}>Specificity</div>
-                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{modelCheckResult.specificity}</div>
-                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretSpecificity(modelCheckResult.specificity)}</p>
+                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{displayedResult.specificity}</div>
+                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretSpecificity(displayedResult.specificity)}</p>
                                 </div>
                             )}
-                            {modelCheckResult.f1_score !== null && (
+                            {displayedResult.f1_score !== null && (
                                 <div style={{ padding: '12px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                                     <div style={{ fontSize: '11px', color: '#5a5a5a' }}>F1-Score</div>
-                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{modelCheckResult.f1_score}</div>
-                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretF1(modelCheckResult.f1_score)}</p>
+                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{displayedResult.f1_score}</div>
+                                    <p style={{ fontSize: '11px', color: '#5a5a5a', marginTop: '6px' }}>{interpretF1(displayedResult.f1_score)}</p>
                                 </div>
                             )}
                         </div>
@@ -1202,9 +1223,14 @@ const TREATMENT_OPTION_EXPLANATIONS= {
     'Retain the risk by informed decision': 'Knowingly accepting the risk as-is, based on an informed trade-off between benefit and risk.',
 }
 
-function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel }) {
-    const [simulating, setSimulating] = useState(null) // speichert die ID des Risikos das gerade simuliert wird
-    const [simDone, setSimDone] = useState({}) // speichert welche Simulationen bereits abgeschlossen sind
+function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel, mitigatedResult, setMitigatedResult }) {
+    const [simulating, setSimulating] = useState(null) //speichert die ID des Risikos
+    const [simDone, setSimDone] = useState({}) //speichert welche Simulationen bereits abgeschlossen sind
+    const [mitigationError, setMitigationError] = useState(null)
+    const [manualOverride, setManualOverride] = useState({})
+    const [treatAnyway, setTreatAnyway] = useState({})
+    const [editingApplied, setEditingApplied] = useState({})
+    const [manuallyApplied, setManuallyApplied] = useState({})
 
     const allGreen = risks.every(r => r.treatmentStatus === 'confirmed')
 
@@ -1214,23 +1240,31 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
         if (!suggestion?.hasSimulation) return
 
         setSimulating(id) //Ladeanimation starten
+        setMitigationError(null)
 
-        //2 Sekunden warten - simuliert dass im Hintergrund etwas passiert
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        try {
+            const response = await fetch('http://127.0.0.1:8000/credit-metrics-mitigated') //Echter Aufruf
+            if (!response.ok) throw new Error('Backend returned an error')
+            const data = await response.json()
+            setMitigatedResult(data)
 
-        //Ergebnis setzen
-        setRisks(risks.map(r => r.id !== id ? r : {
-            ...r,
-            treatmentOption: suggestion.option,
-            treatmentNote: suggestion.note,
-            residualLikelihood: suggestion.simulationResidualLikelihood,
-            residualImpact: suggestion.simulationResidualImpact,
-            residualLevel: getRiskLevel(suggestion.simulationResidualLikelihood, suggestion.simulationResidualImpact),
-            treatmentStatus: 'suggested',
-        }))
+            const newLevel = data.counterfactual_fairness > 0.1 ? 'Moderate' : 'Low' //Wirkliches Ergebnis
+            setRisks(risks.map(r => r.id !== id ? r : {
+                ...r,
+                treatmentOption: suggestion.option,
+                treatmentNote: suggestion.note,
+                residualLikelihood: newLevel,
+                residualImpact: newLevel,
+                residualLevel: getRiskLevel(newLevel, newLevel),
+                treatmentStatus: 'suggested',
+            }))
+            setSimDone(prev => ({ ...prev, [id]: true }))
+        } catch (error) {
+            console.error('Mitigation check failed:', error)
+            setMitigationError('Could not reach the AI model.')
+        }
 
-        setSimulating(null) //Ladeanimation stoppen
-        setSimDone(prev => ({ ...prev, [id]: true })) //Simulation als abgeschlossen markieren
+        setSimulating(null)
     }
 
     function applyAuto(id) {
@@ -1261,8 +1295,15 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                     field === 'residualImpact' ? value : r.residualImpact
                 )
             }
+            //Wenn Option oder Beschreibung nach dem Anwenden nochmal geändert werden, gilt das Treatment wieder als "nicht angewendet" - Phase 2 verschwindet, Button wird wieder aktiv
+            if ((field === 'treatmentOption' || field === 'treatmentNote') && r.treatmentStatus === 'suggested') {
+                updated.treatmentStatus = 'none'
+            }
             return updated
         }))
+        if (field === 'treatmentOption' || field === 'treatmentNote') {
+            setManuallyApplied(prev => ({ ...prev, [id]: false }))
+        }
     }
 
     //Überprüfen des neuen Levels
@@ -1275,6 +1316,19 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
             return
         }
         setRisks(risks.map(r => r.id !== id ? r : { ...r, treatmentStatus: 'confirmed' }))
+    }
+
+    //Bestätigt, dass ein bereits niedriges Risiko bewusst ohne weitere Maßnahme akzeptiert wird
+    function confirmNoTreatmentNeeded(id) {
+        setRisks(risks.map(r => r.id !== id ? r : {
+            ...r,
+            treatmentOption: 'Retain the risk by informed decision',
+            treatmentNote: 'Risk was already assessed as Low/Very Low; accepted without further treatment (ISO 31000 Cl. 6.5.1).',
+            residualLikelihood: r.likelihood,
+            residualImpact: r.impact,
+            residualLevel: r.level,
+            treatmentStatus: 'confirmed',
+        }))
     }
 
     async function saveAndContinue() {
@@ -1323,6 +1377,8 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                 const c = levelColor(risk.level)
                 const rc = levelColor(risk.residualLevel)
                 const s = statusColor(risk.treatmentStatus)
+                const isLowInitial = risk.level === 'Low' || risk.level === 'Very Low'
+                const showFullProcess = !isLowInitial || treatAnyway[risk.id]
 
                 return (
                     <div key={risk.id} style={{ ...styles.card, marginBottom: '20px', borderLeft: `4px solid ${s.border}`, background: s.bg }}>
@@ -1341,7 +1397,30 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                             </div>
                         </div>
 
-                        {risk.treatmentStatus !== 'confirmed' && (
+                        {isLowInitial && risk.treatmentStatus !== 'confirmed' && !treatAnyway[risk.id] && (
+                            <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px' }}>
+                                <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#555' }}>
+                                    This risk is already assessed as "{risk.level}" - ISO 31000 Cl. 6.5.1 does not require active treatment
+                                    at this level. You can accept it as-is, or choose to treat it anyway.
+                                </p>
+                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                    <button
+                                        onClick={() => confirmNoTreatmentNeeded(risk.id)}
+                                        style={{ ...styles.button, marginTop: 0, background: '#2e7d32', fontSize: '13px' }}
+                                    >
+                                        Confirm - No Treatment needed
+                                    </button>
+                                    <button
+                                        onClick={() => setTreatAnyway(prev => ({ ...prev, [risk.id]: true }))}
+                                        style={{ ...styles.buttonOutline, marginTop: 0, fontSize: '13px', padding: '6px 14px' }}
+                                    >
+                                        Treat Anyway
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {showFullProcess && risk.treatmentStatus !== 'confirmed' && (
                             <>
                                 {/* Phase 1 - Treatment definieren */}
                                 <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px', marginBottom: '14px' }}>
@@ -1353,89 +1432,133 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                     {TREATMENT_SUGGESTIONS[risk.id] && (
                                         <div style={{ background: 'rgba(79,195,247,0.08)', border: '1px solid rgba(79,195,247,0.3)', borderRadius: '6px', padding: '12px', marginBottom: '12px' }}>
                                             <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#1565c0', fontWeight: 'bold' }}>
-                                                💡 Suggested Treatment (ISO 31000 Cl. 6.5.2)
+                                                Suggested Treatment (ISO 31000 Cl. 6.5.2)
                                             </p>
                                             <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#555' }}>
                                                 <strong>{TREATMENT_SUGGESTIONS[risk.id].option}:</strong> {TREATMENT_SUGGESTIONS[risk.id].note}
                                             </p>
 
-                                            {/* Simulations-Ergebnis anzeigen wenn fertig */}
-                                            {simDone[risk.id] && (
+                                            {/* Echtes Mitigations-Ergebnis anzeigen wenn fertig */}
+                                            {simDone[risk.id] && mitigatedResult && (
                                                 <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
-                                                    <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
-                                                        ✅ {TREATMENT_SUGGESTIONS[risk.id].simulationResult}
+                                                    <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
+                                                        Re-ran the test with gender removed from the prompt (Fairness through Unawareness, IEEE Std 3198-2025 Cl. 6.2.1.9)
+                                                    </p>
+                                                    <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
+                                                        Counterfactual Fairness: {modelCheckResult ? modelCheckResult.counterfactual_fairness : '?'} → <strong>{mitigatedResult.counterfactual_fairness}</strong>
+                                                        {modelCheckResult && mitigatedResult.counterfactual_fairness < modelCheckResult.counterfactual_fairness
+                                                            ? ' (improved)'
+                                                            : ' (no improvement in this run)'}
                                                     </p>
                                                 </div>
                                             )}
 
-                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                                {/* Manuell übernehmen */}
-                                                <button
-                                                    onClick={() => applyAuto(risk.id)}
-                                                    disabled={simulating === risk.id}
-                                                    style={{ ...styles.buttonSelected, marginTop: 0, background: '#1565c0', fontSize: '12px' }}
-                                                >
-                                                    ✓ Apply This Treatment
-                                                </button>
+                                            {mitigationError && (
+                                                <div style={{ background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
+                                                    <p style={{ margin: 0, fontSize: '13px', color: '#c62828' }}>{mitigationError}</p>
+                                                </div>
+                                            )}
 
-                                                {/* Simulations-Button */}
-                                                {TREATMENT_SUGGESTIONS[risk.id].hasSimulation && (
+                                            {!risk.treatmentOption && !manualOverride[risk.id] && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-start' }}>
+                                                    {TREATMENT_SUGGESTIONS[risk.id].hasSimulation ? (
+                                                        <button
+                                                            onClick={() => runSimulation(risk.id)}
+                                                            disabled={simulating !== null || simDone[risk.id]}
+                                                            style={{
+                                                                ...styles.button,
+                                                                marginTop: 0,
+                                                                background: simDone[risk.id] ? '#aaa' : '#2e7d32',
+                                                                fontSize: '12px',
+                                                                cursor: (simulating !== null || simDone[risk.id]) ? 'not-allowed' : 'pointer',
+                                                                opacity: simDone[risk.id] ? 0.6 : 1,
+                                                            }}
+                                                        >
+                                                            {simulating === risk.id
+                                                                ? 'Re-running test... (~30-60s)'
+                                                                : simDone[risk.id]
+                                                                    ? 'Completed'
+                                                                    : `${TREATMENT_SUGGESTIONS[risk.id].simulationButton}`}
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => applyAuto(risk.id)}
+                                                            style={{ ...styles.buttonSelected, marginTop: 0, background: '#1565c0', fontSize: '12px' }}
+                                                        >
+                                                            ✓ Apply This Treatment
+                                                        </button>
+                                                    )}
                                                     <button
-                                                        onClick={() => runSimulation(risk.id)}
-                                                        disabled={simulating !== null || simDone[risk.id]}
-                                                        style={{
-                                                            ...styles.button,
-                                                            marginTop: 0,
-                                                            background: simDone[risk.id] ? '#aaa' : '#2e7d32',
-                                                            fontSize: '12px',
-                                                            cursor: (simulating !== null || simDone[risk.id]) ? 'not-allowed' : 'pointer',
-                                                            opacity: simDone[risk.id] ? 0.6 : 1,
-                                                        }}
+                                                        onClick={() => setManualOverride(prev => ({ ...prev, [risk.id]: true }))}
+                                                        style={{ ...styles.buttonOutline, marginTop: 0, fontSize: '13px', padding: '8px 16px' }}
                                                     >
-                                                        {simulating === risk.id
-                                                            ? 'Running...'
-                                                            : simDone[risk.id]
-                                                                ? 'Completed'
-                                                                : `${TREATMENT_SUGGESTIONS[risk.id].simulationButton}`}
+                                                        Define manually instead
                                                     </button>
-                                                )}
-                                            </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
-                                    {/* Manuell */}
-                                    <label style={styles.label}>Treatment Option (ISO 31000 Cl. 6.5.2)</label>
-                                    <select
-                                        style={{ ...styles.input, marginBottom: '10px' }}
-                                        value={risk.treatmentOption}
-                                        onChange={e => updateTreatment(risk.id, 'treatmentOption', e.target.value)}
-                                    >
-                                        <option value="">- Select Treatment Option -</option>
-                                        {ISO_TREATMENT_OPTIONS.map(o => <option key={o}>{o}</option>)}
-                                    </select>
-                                    {risk.treatmentOption && (
-                                        <FieldHint text={TREATMENT_OPTION_EXPLANATIONS[risk.treatmentOption]} />
+                                    {/* Fall A: Vorschlag wurde bereits übernommen -> nur Zusammenfassung + Edit-Link, kein offenes Formular */}
+                                    {TREATMENT_SUGGESTIONS[risk.id] && risk.treatmentOption && !manualOverride[risk.id] && !editingApplied[risk.id] && (
+                                        <div style={{ background: 'white', border: '1px solid #ddd', borderRadius: '6px', padding: '12px' }}>
+                                            <p style={{ margin: '0 0 4px', fontSize: '13px' }}>
+                                                <strong>Treatment:</strong> {risk.treatmentOption}
+                                            </p>
+                                            <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#555' }}>{risk.treatmentNote}</p>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingApplied(prev => ({ ...prev, [risk.id]: true }))
+                                                    setManuallyApplied(prev => ({ ...prev, [risk.id]: false }))
+                                                }}
+                                                style={{ ...styles.buttonOutline, marginTop: 0, fontSize: '12px' }}
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
                                     )}
-                                    <label style={styles.label}>Treatment Description <span style={{ color: '#c62828' }}>*</span></label>
-                                    <textarea
-                                        style={{ ...styles.input, height: '70px', resize: 'vertical' }}
-                                        placeholder="Describe the specific measures to be implemented..."
-                                        value={risk.treatmentNote}
-                                        onChange={e => updateTreatment(risk.id, 'treatmentNote', e.target.value)}
-                                    />
-                                    <button
-                                        onClick={() => updateTreatment(risk.id, 'treatmentStatus', 'suggested')}
-                                        disabled={!risk.treatmentOption || !risk.treatmentNote}
-                                        style={{
-                                            ...styles.button,
-                                            marginTop: '12px',
-                                            background: (!risk.treatmentOption || !risk.treatmentNote) ? '#aaa' : '#1565c0',
-                                            cursor: (!risk.treatmentOption || !risk.treatmentNote) ? 'not-allowed' : 'pointer',
-                                            opacity: (!risk.treatmentOption || !risk.treatmentNote) ? 0.6 : 1,
-                                        }}
-                                    >
-                                        Apply Treatment →
-                                    </button>
+
+                                    {/* Fall B: kein Vorschlag vorhanden, oder User bearbeitet/definiert manuell */}
+                                    {(!TREATMENT_SUGGESTIONS[risk.id] || manualOverride[risk.id] || editingApplied[risk.id]) && (
+                                        <>
+                                            <label style={styles.label}>Treatment Option (ISO 31000 Cl. 6.5.2)</label>
+                                            <select
+                                                style={{ ...styles.input, marginBottom: '10px' }}
+                                                value={risk.treatmentOption}
+                                                onChange={e => updateTreatment(risk.id, 'treatmentOption', e.target.value)}
+                                            >
+                                                <option value="">- Select Treatment Option -</option>
+                                                {ISO_TREATMENT_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                                            </select>
+                                            {risk.treatmentOption && (
+                                                <FieldHint text={TREATMENT_OPTION_EXPLANATIONS[risk.treatmentOption]} />
+                                            )}
+                                            <label style={styles.label}>Treatment Description <span style={{ color: '#c62828' }}>*</span></label>
+                                            <textarea
+                                                style={{ ...styles.input, height: '70px', resize: 'vertical' }}
+                                                placeholder="Describe the specific measures to be implemented..."
+                                                value={risk.treatmentNote}
+                                                onChange={e => updateTreatment(risk.id, 'treatmentNote', e.target.value)}
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    updateTreatment(risk.id, 'treatmentStatus', 'suggested')
+                                                    setEditingApplied(prev => ({ ...prev, [risk.id]: false }))
+                                                    setManuallyApplied(prev => ({ ...prev, [risk.id]: true }))
+                                                }}
+                                                disabled={!risk.treatmentOption || !risk.treatmentNote || manuallyApplied[risk.id]}
+                                                style={{
+                                                    ...styles.button,
+                                                    marginTop: '12px',
+                                                    background: manuallyApplied[risk.id] ? '#aaa' : (!risk.treatmentOption || !risk.treatmentNote) ? '#aaa' : '#1565c0',
+                                                    cursor: (!risk.treatmentOption || !risk.treatmentNote || manuallyApplied[risk.id]) ? 'not-allowed' : 'pointer',
+                                                    opacity: (!risk.treatmentOption || !risk.treatmentNote || manuallyApplied[risk.id]) ? 0.6 : 1,
+                                                }}
+                                            >
+                                                {manuallyApplied[risk.id] ? '✓ Applied' : 'Apply Treatment →'}
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
 
                                 {/* Phase 2 - Residual Risk einschätzen */}
@@ -1445,6 +1568,11 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                         <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#666' }}>
                                             After applying this measure, how do you assess the remaining risk? (ISO 31000 Cl. 6.5.1)
                                         </p>
+                                        {mitigatedResult && simDone[risk.id] && (
+                                            <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#8d6e00', fontStyle: 'italic' }}>
+                                                Pre-filled from the re-measured Counterfactual Fairness ({mitigatedResult.counterfactual_fairness}) - feel free to adjust below if you assess it differently.
+                                            </p>
+                                        )}
                                         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
                                             <div style={{ flex: 1 }}>
                                                 <label style={styles.label}>Residual Likelihood</label>
@@ -1486,7 +1614,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                         {(risk.residualLevel === 'High' || risk.residualLevel === 'Very High') && (
                                             <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
                                                 <p style={{ margin: 0, fontSize: '13px', color: '#c62828', fontWeight: 'bold' }}>
-                                                    ⚠️ Residual risk is still {risk.residualLevel}. Consider refining your treatment measure or choosing a different option before confirming.
+                                                    Residual risk is still {risk.residualLevel}. Consider refining your treatment measure or choosing a different option before confirming.
                                                 </p>
                                             </div>
                                         )}
@@ -1504,7 +1632,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                             cursor: (risk.residualLevel === 'High' || risk.residualLevel === 'Very High') ? 'not-allowed' : 'pointer',
                                         }}
                                     >
-                                        ✓ Confirm Treatment & Accept Residual Risk
+                                        Confirm Treatment & Accept Residual Risk
                                     </button>
                                 )}
                             </>
@@ -1524,7 +1652,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                         onClick={() => setRisks(risks.map(r => r.id !== risk.id ? r : { ...r, treatmentStatus: 'none' }))}
                                         style={{ ...styles.buttonOutline, marginTop: 0, fontSize: '12px' }}
                                     >
-                                        ✏️ Edit
+                                        Edit
                                     </button>
                                 </div>
                             </div>
@@ -1758,6 +1886,9 @@ export default function App() {
     const [occlusionResult, setOcclusionResult] = useState(null)
     const [occlusionError, setOcclusionError] = useState(null)
 
+    const [mitigatedResult, setMitigatedResult] = useState(null)
+
+
     async function runModelCheck() {
         setModelCheckLoading(true)
         setModelCheckError(null)
@@ -1850,7 +1981,7 @@ export default function App() {
                 occlusionLoading={occlusionLoading} occlusionResult={occlusionResult} occlusionError={occlusionError} runOcclusionTest={runOcclusionTest}
             />
             case 3: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} />
-            case 4: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} />
+            case 4: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} mitigatedResult={mitigatedResult} setMitigatedResult={setMitigatedResult} />
             case 5: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} onFinish={() => setScreen('landing')} />
             default: return null
         }
@@ -1870,6 +2001,7 @@ export default function App() {
         setModelCheckError(null)
         setOcclusionResult(null)
         setOcclusionError(null)
+        setMitigatedResult(null)
         setCurrentStep(1)
         setScreen('form')
     }
@@ -1918,6 +2050,7 @@ export default function App() {
                 <AIModelCheckPanel
                     modelCheckResult={modelCheckResult}
                     occlusionResult={occlusionResult}
+                    mitigatedResult={mitigatedResult}
                     onClose={() => setModelCheckPanelOpen(false)}
                 />
             )}

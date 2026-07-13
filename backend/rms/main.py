@@ -167,12 +167,11 @@ def credit_test(applicant_id: int):
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=502, detail=f"Could not reach Ollama: {str(e)}")
 
-#Testet alle Antragssteller + Berechnungen
-@app.get("/credit-metrics")
-def credit_metrics():
+#Kernlogik als eigene Funktion, damit sie mit und ohne "omit_field" wiederverwendbar ist
+def compute_credit_metrics(omit_field: str = None):
     results = []
     for applicant in CREDIT_APPLICANTS:
-        prompt = build_credit_prompt(applicant)
+        prompt = build_credit_prompt(applicant, omit_field=omit_field)
         try:
             response = requests.post(OLLAMA_URL, json={
                 "model": OLLAMA_MODEL,
@@ -231,6 +230,19 @@ def credit_metrics():
         "unclear_count": unclear_count,
         "sample_size": len(results),
     }
+
+
+#Testet alle Antragssteller + Berechnungen
+@app.get("/credit-metrics")
+def credit_metrics():
+    return compute_credit_metrics()
+
+
+#Wiederholt denselben Test, aber ohne "gender" im Prompt
+#(IEEE Std 3198-2025, Cl. 6.2.1.9), simuliert eine Bias-Mitigation-Maßnahme
+@app.get("/credit-metrics-mitigated")
+def credit_metrics_mitigated():
+    return compute_credit_metrics(omit_field="gender")
 
 #Occlusion = Testet einen Antragssteller mit je einem fehlenden Feld
 @app.get("/occlusion-test/{applicant_id}")
