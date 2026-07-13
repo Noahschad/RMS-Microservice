@@ -502,10 +502,56 @@ function interpretF1(f1) {
     return `F1 combines Precision and Recall into one score (${pct}%).`
 }
 
+//NIST SP 800-30, Table I-3 (semi-quantitative bins, 0-100 scale)
+const NIST_SEMI_QUANT_BINS = [
+    { max: 4, level: 'Very Low' },
+    { max: 20, level: 'Low' },
+    { max: 79, level: 'Moderate' },
+    { max: 95, level: 'High' },
+    { max: 100, level: 'Very High' },
+]
+
+function scoreToNistLevel(score) {
+    const clamped = Math.max(0, Math.min(100, score))
+    const bin = NIST_SEMI_QUANT_BINS.find(b => clamped <= b.max)
+    return bin ? bin.level : 'Very High'
+}
+
+//Ordnet genau drei Risiken (per ID) eine Metrik zu und leitet daraus einen Likelihood/Impact-Vorschlag ab
+function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
+    if (riskId === 10 && modelCheckResult) {
+        const score = modelCheckResult.counterfactual_fairness * 100
+        const level = scoreToNistLevel(score)
+        return {
+            level,
+            reason: `Counterfactual Fairness measured at ${modelCheckResult.counterfactual_fairness} (${score.toFixed(0)}/100 on the NIST SP 800-30 Table I-3 scale) - suggesting Likelihood/Impact of "${level}".`,
+        }
+    }
+    if (riskId === 8 && modelCheckResult) {
+        const errorRate = (1 - modelCheckResult.accuracy) * 100
+        const level = scoreToNistLevel(errorRate)
+        return {
+            level,
+            reason: `Accuracy measured at ${Math.round(modelCheckResult.accuracy * 100)}% (error rate ${errorRate.toFixed(0)}/100 on the NIST SP 800-30 Table I-3 scale) - suggesting Likelihood/Impact of "${level}".`,
+        }
+    }
+    if (riskId === 2 && occlusionResult) {
+        const total = occlusionResult.occlusion_results.length
+        const influential = occlusionResult.occlusion_results.filter(r => r.changed_from_baseline).length
+        const score = (influential / total) * 100
+        const level = scoreToNistLevel(score)
+        return {
+            level,
+            reason: `Occlusion test showed ${influential} of ${total} fields changed the decision when removed (${score.toFixed(0)}/100 on the NIST SP 800-30 Table I-3 scale) - suggesting Likelihood/Impact of "${level}".`,
+        }
+    }
+    return null
+}
+
 function AIModelCheckPanel({ modelCheckResult, occlusionResult, onClose }) {
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end' }}>
-            <div style={{ background: 'white', width: '640px', maxWidth: '90vw', height: '100vh', overflowY: 'auto', padding: '32px', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'stretch', justifyContent: 'flex-end' }}>
+            <div style={{ background: 'white', width: '640px', maxWidth: '90vw', height: '100%', boxSizing: 'border-box', overflowY: 'auto', padding: '32px', paddingBottom: '80px', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <h2 style={{ margin: 0, fontSize: '20px' }}>AI Model Check Details</h2>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#666' }}>✕</button>
@@ -758,7 +804,11 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
     const filtered = RISK_CATALOG.filter(r =>
         (!scope.domain || r.domains.includes(scope.domain)) &&
         (!scope.phase || r.phases.includes(scope.phase))
-    )
+    ).sort((a, b) => {
+        const aHasEvidence = getMetricSuggestion(a.id, modelCheckResult, occlusionResult) ? 1 : 0
+        const bHasEvidence = getMetricSuggestion(b.id, modelCheckResult, occlusionResult) ? 1 : 0
+        return bHasEvidence - aHasEvidence
+    })
 
     function toggle(risk) {
         if (risks.find(r => r.id === risk.id)) {
@@ -995,12 +1045,21 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
 
             {filtered.map(risk => {
                 const selected = !!risks.find(r => r.id === risk.id)
+                const suggestion = getMetricSuggestion(risk.id, modelCheckResult, occlusionResult)
                 return (
-                    <div key={risk.id} style={{ ...styles.card, marginBottom: '10px', borderLeft: selected ? '4px solid #4fc3f7' : '4px solid #e0e0e0', background: selected ? '#f0f7ff' : '#fafafa' }}>
+                    <div key={risk.id} style={{ ...styles.card, marginBottom: '10px', borderLeft: selected ? '4px solid #4fc3f7' : (suggestion ? '4px solid #f9a825' : '4px solid #e0e0e0'), background: selected ? '#f0f7ff' : '#fafafa' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div style={{ flex: 1 }}>
-                                <strong style={{ color: '#1a1a2e' }}>{risk.title}</strong>
+                                {suggestion && (
+                                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'white', background: '#f9a825', padding: '3px 8px', borderRadius: '10px', marginBottom: '6px', display: 'inline-block' }}>
+                                        AI Model Evidence Available
+                                    </span>
+                                )}
+                                <strong style={{ color: '#1a1a2e', display: 'block' }}>{risk.title}</strong>
                                 <p style={{ margin: '4px 0', color: '#555', fontSize: '14px' }}>{risk.description}</p>
+                                {suggestion && (
+                                    <p style={{ margin: '4px 0', color: '#8d6e00', fontSize: '13px', fontStyle: 'italic' }}>{suggestion.reason}</p>
+                                )}
                                 <span style={styles.sourceTag}>{risk.source}</span>
                             </div>
                             <button style={{ ...(selected ? styles.buttonSelected : styles.buttonOutline), marginTop: 0, marginLeft: '16px', whiteSpace: 'nowrap' }} onClick={() => toggle(risk)}>
@@ -1018,6 +1077,8 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
 
 //Risk level Berechnung
 function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel }) {
+    const [appliedSuggestions, setAppliedSuggestions] = useState({})
+
     function update(id, field, value) {
         setRisks(risks.map(r => {
             if (r.id !== id) return r
@@ -1025,6 +1086,14 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
             updated.level = getRiskLevel(updated.likelihood, updated.impact)
             return updated
         }))
+    }
+
+    function updateBoth(id, likelihood, impact) {
+        setRisks(risks.map(r => {
+            if (r.id !== id) return r
+            return { ...r, likelihood, impact, level: getRiskLevel(likelihood, impact) }
+        }))
+        setAppliedSuggestions(prev => ({ ...prev, [id]: true }))
     }
 
     async function saveAndContinue() {
@@ -1059,6 +1128,7 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
 
             {risks.map(risk => {
                 const c = levelColor(risk.level)
+                const suggestion = getMetricSuggestion(risk.id, modelCheckResult, occlusionResult)
                 return (
                     <div key={risk.id} style={{ ...styles.card, marginBottom: '12px', borderLeft: `4px solid ${c.text}` }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -1068,6 +1138,26 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
                             </div>
                             <span style={{ ...styles.badge, background: c.bg, color: c.text, whiteSpace: 'nowrap', marginLeft: '16px' }}>{risk.level}</span>
                         </div>
+
+                        {suggestion && (
+                            <div style={{ background: '#fff8e1', border: '1px solid #f9a825', borderRadius: '6px', padding: '12px', marginBottom: '14px' }}>
+                                <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#8d6e00' }}>
+                                    <strong>AI Model Evidence:</strong> {suggestion.reason}
+                                </p>
+                                <button
+                                    onClick={() => updateBoth(risk.id, suggestion.level, suggestion.level)}
+                                    style={{ ...styles.buttonSelected, marginTop: 0, background: '#8d6e00', fontSize: '12px' }}
+                                >
+                                    ✓ Apply Suggested Likelihood and Impact ("{suggestion.level}")
+                                </button>
+                                {appliedSuggestions[risk.id] && (
+                                    <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#2e7d32', fontWeight: 'bold' }}>
+                                        ✓ Applied - Likelihood and Impact set to "{suggestion.level}".
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', gap: '16px' }}>
                             <div style={{ flex: 1 }}>
                                 <label style={styles.label}>Likelihood (NIST SP 800-30 Table G-3)</label>
