@@ -89,7 +89,7 @@ const TREATMENT_SUGGESTIONS = {
         option: 'Remove risk source',
         note: 'Test the AI again without telling it the applicant\'s gender, and check whether this reduces unfair treatment.',
         hasSimulation: true,
-        simulationButton: 'Apply Fairness Constraints',
+        simulationButton: 'Apply Fairness Constraints (~1-3min)',
         //simulationResult: 'Fairness check complete. Affected borrower groups identified and corrected. Loan approval rate gap reduced from 31% to 5%.',
         //simulationResidualLikelihood: 'Low',
         //simulationResidualImpact: 'Moderate',
@@ -145,28 +145,28 @@ function Stepper({ currentStep, onStepClick }) {
                     return (
                         <div key={step.id} style={{ display: 'flex', alignItems: 'center', flex: idx < STEPS.length - 1 ? 1 : 0, minWidth: idx < STEPS.length - 1 ? 0 : 'auto' }}>
                             <div
-                                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: isDone ? 'pointer' : 'default', width: '130px', flexShrink: 0 }}
+                                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: isDone ? 'pointer' : 'default', width: '150px', flexShrink: 0 }}
                                 onClick={() => isDone && onStepClick(step.id)}
                             >
                                 <div style={{ //Kreis mit Zahl
-                                    width: '36px', height: '36px', borderRadius: '50%',
+                                    width: '48px', height: '48px', borderRadius: '50%',
                                     background: isActive ? '#1a1a2e' : isDone ? '#4fc3f7' : '#e0e0e0',
                                     color: isActive || isDone ? 'white' : '#999',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontWeight: 'bold', fontSize: '14px', transition: 'all 0.2s',
-                                    border: isActive ? '2px solid #4fc3f7' : '2px solid transparent',
+                                    fontWeight: 'bold', fontSize: '18px', transition: 'all 0.2s',
+                                    border: isActive ? '3px solid #4fc3f7' : '3px solid transparent',
                                 }}>
                                     {isDone ? '✓' : step.id}
                                 </div>
-                                <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: isActive ? 'bold' : 'normal', color: isActive ? '#1a1a2e' : isDone ? '#4fc3f7' : '#999', textAlign: 'center', whiteSpace: 'nowrap' }}> {/*Text unter dem Kreis*/}
+                                <div style={{ marginTop: '8px', fontSize: '15px', fontWeight: isActive ? 'bold' : 'normal', color: isActive ? '#1a1a2e' : isDone ? '#4fc3f7' : '#999', textAlign: 'center', whiteSpace: 'nowrap' }}> {/*Text unter dem Kreis*/}
                                     {step.label}
                                 </div>
-                                <div style={{ fontSize: '10px', color: '#6b7d94', textAlign: 'center', whiteSpace: 'nowrap' }}> {/*Quellenverweis*/}
+                                <div style={{ fontSize: '12px', color: '#6b7d94', textAlign: 'center', whiteSpace: 'nowrap' }}> {/*Quellenverweis*/}
                                     {step.sub}
                                 </div>
                             </div>
                             {idx < STEPS.length - 1 && (
-                                <div style={{ flex: 1, height: '2px', background: isDone ? '#4fc3f7' : '#e0e0e0', margin: '0 8px', marginBottom: '28px', transition: 'background 0.3s' }} />
+                                <div style={{ flex: 1, height: '3px', background: isDone ? '#4fc3f7' : '#e0e0e0', margin: '0 12px', marginBottom: '38px', transition: 'background 0.3s' }} />
                             )}
                         </div>
                     )
@@ -824,6 +824,8 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                     scope: form,
                     likelihood_scale: likelihoodScale,
                     impact_scale: impactScale,
+                    //Bei einer erneuten Bewertung gilt das Assessment ab sofort wieder als "in progress",nicht mehr als "completed" + alte Risiken werden geleert
+                    ...(isReassessment ? { status: 'in_progress', risks: [] } : {}),
                 }),
             })
         } catch (error) {
@@ -964,7 +966,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
             <h1 style={styles.heading}>Risk Identification</h1>
             <p style={styles.sub}>
                 {scope.domain
-                    ? `Showing risks for domain "${scope.domain}" · stage "${scope.phase}" - ISO/IEC 23894 Annex B & C`
+                    ? `Showing risks for domain "${scope.domain}" · stage "${scope.phase}"`
                     : 'All catalog risks shown - no scope filter active.'}
             </p>
             <div style={{ ...styles.card, marginBottom: '16px', background: '#f0f7ff', border: '1px solid #b3d9f7' }}>
@@ -2026,7 +2028,7 @@ const styles = {
     nav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', height: '56px', background: '#1a1a2e', color: 'white' },
     navBrand: { fontWeight: 'bold', fontSize: '18px', color: '#4fc3f7', letterSpacing: '1px' },
     stepperWrap: { background: '#eef5fb', borderBottom: '1px solid #d6e8f5', padding: '20px 48px' },
-    stepperInner: { display: 'flex', alignItems: 'flex-start', maxWidth: '900px' },
+    stepperInner: { display: 'flex', alignItems: 'flex-start', maxWidth: '1300px' },
     page: { padding: '40px 48px', width: '100%', boxSizing: 'border-box' },
     heading: { fontSize: '28px', marginBottom: '8px', color: '#1a1a2e' },
     sub: { color: '#666', marginBottom: '24px', fontSize: '14px' },
