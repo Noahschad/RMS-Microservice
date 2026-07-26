@@ -385,60 +385,60 @@ function LandingPage({ onStart, onResume }) {
     }, [])
 
     return (
-        <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #243652 0%, #1a4a7a 55%, #2b6ca3 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-            <div style={{ maxWidth: '1000px', textAlign: 'center', color: 'white' }}>
-                <div style={{ fontSize: '13px', letterSpacing: '2px', color: '#4fc3f7', textTransform: 'uppercase', marginBottom: '16px' }}>
+        <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #dceaf5 0%, #c9dced 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+            <div style={{ maxWidth: '1000px', textAlign: 'center', color: COLORS.navy }}>
+                <div style={{ fontSize: '13px', letterSpacing: '2px', color: '#1565c0', textTransform: 'uppercase', marginBottom: '16px', fontWeight: 'bold' }}>
                     EU AI Act · Article 9
                 </div>
-                <h1 style={{ fontSize: '48px', fontWeight: 'bold', margin: '0 0 16px', lineHeight: 1.2, color: '#4fc3f7' }}>
+                <h1 style={{ fontSize: '48px', fontWeight: 'bold', margin: '0 0 16px', lineHeight: 1.2, color: COLORS.navy }}>
                     Risk Management System
                 </h1>
-                <p style={{ fontSize: '18px', color: '#ccc', marginBottom: '32px', lineHeight: 1.6 }}>
+                <p style={{ fontSize: '18px', color: '#3a4a5c', marginBottom: '32px', lineHeight: 1.6 }}>
                     A structured risk management process for high-risk AI systems, grounded in ISO 31000:2018, ISO/IEC 23894:2023, NIST SP 800-30, and NIST AI RMF 1.0.
                 </p>
 
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '48px', flexWrap: 'wrap' }}>
                     {STEPS.map(step => (
-                        <div key={step.id} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(79,195,247,0.3)', borderRadius: '10px', padding: '14px 16px', textAlign: 'center' }}>
-                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#4fc3f7' }}>{step.label}</div>
-                            <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{step.sub}</div>
+                        <div key={step.id} style={{ background: 'white', border: `1px solid ${COLORS.cardBorder}`, borderRadius: '10px', padding: '14px 16px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#1565c0' }}>{step.label}</div>
+                            <div style={{ fontSize: '11px', color: '#6b7d94', marginTop: '4px' }}>{step.sub}</div>
                         </div>
                     ))}
                 </div>
 
                 <button
                     onClick={onStart}
-                    style={{ padding: '16px 48px', background: '#4fc3f7', color: '#1a1a2e', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}
+                    style={{ padding: '16px 48px', background: COLORS.navy, color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}
                 >
                     Start Assessment →
                 </button>
-                <p style={{ fontSize: '12px', color: '#8fa5c2', marginTop: '16px' }}>
+                <p style={{ fontSize: '12px', color: '#5a7085', marginTop: '16px' }}>
                     Grounded in ISO 31000:2018 · ISO/IEC 23894:2023 · NIST SP 800-30 · NIST AI RMF 1.0
                 </p>
                 {/* Assessments Liste */}
                 {!loading && assessments.length > 0 && ( //Bedingungen fürs Anzeigen der Assessments Liste
-                    <div style={{ marginTop: '48px', textAlign: 'left' }}>
-                        <h3 style={{ color: '#4fc3f7', fontSize: '14px', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '16px' }}>
+                    <div style={{ marginTop: '48px', textAlign: 'left', maxWidth: '820px', marginLeft: 'auto', marginRight: 'auto' }}>
+                        <h3 style={{ color: '#1565c0', fontSize: '14px', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '16px' }}>
                             Resume an Assessment
                         </h3>
                         {assessments.map(a => {
                             const isComplete = a.status === 'completed'
                             const stepLabel = STEPS.find(s => s.id === a.current_step)?.label || 'Unknown'
                             return (
-                                <div key={a.id} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(79,195,247,0.2)', borderRadius: '10px', padding: '16px 20px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div key={a.id} style={{ background: 'white', border: `1px solid ${COLORS.cardBorder}`, borderRadius: '10px', padding: '16px 20px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                                     <div>
-                                        <div style={{ fontWeight: 'bold', color: 'white', fontSize: '15px' }}>
+                                        <div style={{ fontWeight: 'bold', color: COLORS.navy, fontSize: '18px' }}>
                                             {a.ai_system.ai_system_name}
                                         </div>
-                                        <div style={{ fontSize: '13px', color: '#aaa', marginTop: '4px' }}>
+                                        <div style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>
                                             {a.ai_system.assessor_name} · {a.ai_system.date}
                                         </div>
-                                        <div style={{ fontSize: '12px', color: '#7a90ab', marginTop: '4px' }}>
+                                        <div style={{ fontSize: '13px', color: '#8fa5c2', marginTop: '4px' }}>
                                             ID: {a.id}
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                                        <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: isComplete ? 'rgba(46,125,50,0.3)' : 'rgba(79,195,247,0.2)', color: isComplete ? '#81c784' : '#4fc3f7', fontWeight: 'bold' }}>
+                                        <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: isComplete ? '#e8f5e9' : '#e3f2fd', color: isComplete ? '#2e7d32' : '#1565c0', fontWeight: 'bold' }}>
                                             {isComplete ? '✓ Completed' : `In Progress · Step ${a.current_step}`} {/*Ist das Assessment abgeschlossen?*/}
                                         </span>
                                         {isComplete && (() => {  //wenn abgeschlossen
@@ -448,19 +448,19 @@ function LandingPage({ onStart, onResume }) {
                                                 ? `${pending.slice(0, 2).join(', ')} +${pending.length - 2} more`
                                                 : pending.join(', ')
                                             return (
-                                                <div style={{ fontSize: '11px', color: '#8fa5c2', textAlign: 'right', maxWidth: '260px', lineHeight: 1.5 }}>
-                                                    Stage: <strong style={{ color: '#4fc3f7' }}>{a.scope?.phase || '-'}</strong>
+                                                <div style={{ fontSize: '11px', color: '#6b7d94', textAlign: 'right', maxWidth: '260px', lineHeight: 1.5 }}>
+                                                    Stage: <strong style={{ color: '#1565c0' }}>{a.scope?.phase || '-'}</strong>
                                                     {pending.length > 0 ? (
                                                         <div>Pending: {pendingLabel}</div>
                                                     ) : (
-                                                        <div style={{ color: '#81c784' }}>Final stage reached</div>
+                                                        <div style={{ color: '#2e7d32' }}>Final stage reached</div>
                                                     )}
                                                 </div>
                                             )
                                         })()}
                                         <button
                                             onClick={() => onResume(a)}
-                                            style={{ padding: '8px 16px', background: isComplete ? 'transparent' : '#4fc3f7', color: isComplete ? '#4fc3f7' : '#1a1a2e', border: isComplete ? '1px solid #4fc3f7' : 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                            style={{ padding: '10px 18px', background: isComplete ? 'white' : COLORS.navy, color: isComplete ? '#1565c0' : 'white', border: isComplete ? '1px solid #1565c0' : 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
                                         >
                                             {isComplete ? 'Review & Update →' : 'Resume →'}
                                         </button>
@@ -543,7 +543,7 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
         const level = scoreToNistLevel((1 - modelCheckResult.accuracy) * 100)
         return {
             level,
-            reason: `The AI got ${Math.round(modelCheckResult.accuracy * 100)}% of test decisions right.`,
+            reason: `The AI got ${Math.round(modelCheckResult.accuracy * 100)}% of test decisions right. A low result from a single test run is exactly the kind of undetected problem this risk is about.`,
         }
     }
     if (riskId === 2 && occlusionResult) {
@@ -762,12 +762,19 @@ function FieldHint({ text }) {
 }
 
 //Startformular - Muss vom User ausgefüllt werden
-function UserForm({ onBegin }) {
+function UserForm({ onBegin, onBack }) {
     const [form, setForm] = useState({ assessorName: '', role: '', aiSystemName: '', date: new Date().toISOString().split('T')[0] })
     const isValid = form.assessorName.trim() && form.role.trim() && form.aiSystemName.trim() && form.date
 
     return (
-        <div style={{ minHeight: '100vh', background: COLORS.bgLight, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>            <div style={{ background: 'white', borderRadius: '12px', padding: '56px', width: '100%', maxWidth: '680px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+        <div style={{ minHeight: '100vh', background: COLORS.bgLight, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+            <div style={{ background: 'white', borderRadius: '12px', padding: '56px', width: '100%', maxWidth: '680px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+                <button
+                    onClick={onBack}
+                    style={{ ...styles.buttonOutline, marginTop: 0, position: 'absolute', top: '24px', left: '24px', padding: '6px 14px', fontSize: '13px' }}
+                >
+                    ← Back
+                </button>
                 <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                     <div style={{ fontSize: '12px', letterSpacing: '2px', color: '#4fc3f7', textTransform: 'uppercase', marginBottom: '8px' }}>New Assessment</div>
                     <h2 style={{ margin: 0, fontSize: '24px', color: '#1a1a2e' }}>Who is conducting this assessment?</h2>
@@ -1080,7 +1087,8 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
                     <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px' }}>
                         <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
                             {modelCheckResult.unclear_count} response(s) could not be clearly classified as "approved" or "rejected"
-                            and were excluded from Precision/Recall/Specificity/F1.
+                            and were excluded from Precision/Recall/Specificity/F1. (Note: They still count as
+                            incorrect in Accuracy, and may still affect Counterfactual Fairness above.)
                         </p>
                     </div>
                 )}
@@ -1597,16 +1605,16 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                             {risk.id === 8 && simDone[risk.id] && extendedValidationResult && (
                                                 <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
                                                     <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
-                                                        Ran {extendedValidationResult.runs} independent test passes instead of one (cf. Aji &amp; Dhini, 2019, on cross-validation)
+                                                        Tested the AI {extendedValidationResult.runs} times instead of once
                                                     </p>
                                                     <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#2e7d32' }}>
-                                                        Individual accuracy results: {extendedValidationResult.individual_accuracies.map(a => `${Math.round(a * 100)}%`).join(', ')}
+                                                        Results per test: {extendedValidationResult.individual_accuracies.map(a => `${Math.round(a * 100)}%`).join(', ')} correct
                                                     </p>
                                                     <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
-                                                        Average: <strong>{Math.round(extendedValidationResult.average_accuracy * 100)}%</strong>, range: {Math.round(extendedValidationResult.accuracy_range[0] * 100)}%–{Math.round(extendedValidationResult.accuracy_range[1] * 100)}%
+                                                        On average: <strong>{Math.round(extendedValidationResult.average_accuracy * 100)}%</strong> correct.
                                                         {(extendedValidationResult.accuracy_range[1] - extendedValidationResult.accuracy_range[0]) > 0.15
-                                                            ? ' - notable run-to-run variability, indicating the model\'s performance is not yet reliably validated.'
-                                                            : ' - results were consistent across runs.'}
+                                                            ? ' The results changed a lot between tests, so a single test alone would not be reliable enough.'
+                                                            : ' The results stayed fairly similar each time.'}
                                                     </p>
                                                 </div>
                                             )}
@@ -2203,7 +2211,7 @@ export default function App() {
     }
 
     if (screen === 'landing') return <LandingPage onStart={resetAll} onResume={handleResume} />
-    if (screen === 'form') return <UserForm onBegin={handleBegin} />
+    if (screen === 'form') return <UserForm onBegin={handleBegin} onBack={() => setScreen('landing')} />
 
     return (
         <div style={{ minHeight: '100vh', background: COLORS.bgLight }}>
