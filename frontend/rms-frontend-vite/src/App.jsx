@@ -73,7 +73,7 @@ const MISUSE_CATEGORIES = [
 
 //Beispiele
 const MISUSE_CATEGORY_EXAMPLES = {
-    'Use beyond intended scope': 'Example: a system built to detect faces in social media photos gets reused to identify suspects in surveillance footage.',
+    'Use beyond intended scope': 'Example: A system built to detect faces in social media photos gets reused to identify suspects in surveillance footage.',
     'Adversarial threats': 'Example: Evasion attacks, poisoning, backdoors, model extraction, membership inference, model inversion, supply chain attacks',
     'Privacy violation through unauthorized use': 'Example: Sensitive attribute inference, re-identification, data leakage, unauthorized surveillance',
     'Disinformation & deception': 'Example: Deepfakes, automated fake news, targeted propaganda, harmful/illegal content generation, prompt injection, erosion of trust',
@@ -96,13 +96,13 @@ const TREATMENT_SUGGESTIONS = {
     },
     8: {
         option: 'Change likelihood',
-        note: 'Test the AI multiple times instead of just once, and look at the average and how much the results vary - this makes it less likely that a bad result goes unnoticed just because we only tested once.',
+        note: 'Test the AI multiple times instead of just once, and look at the average and how much the results vary - this makes it less likely that a bad result goes unnoticed after only a single test.',
         hasSimulation: true,
         simulationButton: 'Run Extended Validation (2 runs, ~3-5 min)',
     },
     2: {
         option: 'Change likelihood',
-        note: 'Test which piece of information matters most across several example applicants instead of just one, to see if the same answer keeps coming up - this makes the explanation more trustworthy.',
+        note: 'Rather than relying on a single test case, check whether the same piece of information matters across several applicants. This lowers the chance that an unreliable explanation goes unnoticed.',
         hasSimulation: true,
         simulationButton: 'Run Occlusion Across Applicants (~3-5 min)',
     },
@@ -143,9 +143,9 @@ function Stepper({ currentStep, onStepClick }) {
                     const isActive = step.id === currentStep
                     const isDone = step.id < currentStep
                     return (
-                        <div key={step.id} style={{ display: 'flex', alignItems: 'center', flex: idx < STEPS.length - 1 ? 1 : 0 }}>
+                        <div key={step.id} style={{ display: 'flex', alignItems: 'center', flex: idx < STEPS.length - 1 ? 1 : 0, minWidth: idx < STEPS.length - 1 ? 0 : 'auto' }}>
                             <div
-                                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: isDone ? 'pointer' : 'default' }}
+                                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: isDone ? 'pointer' : 'default', width: '130px', flexShrink: 0 }}
                                 onClick={() => isDone && onStepClick(step.id)}
                             >
                                 <div style={{ //Kreis mit Zahl
@@ -158,7 +158,7 @@ function Stepper({ currentStep, onStepClick }) {
                                 }}>
                                     {isDone ? '✓' : step.id}
                                 </div>
-                                <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: isActive ? 'bold' : 'normal', color: isActive ? '#1a1a2e' : isDone ? '#4fc3f7' : '#999', textAlign: 'center', whiteSpace: 'nowrap' }}> //Text unter dem Kreis
+                                <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: isActive ? 'bold' : 'normal', color: isActive ? '#1a1a2e' : isDone ? '#4fc3f7' : '#999', textAlign: 'center', whiteSpace: 'nowrap' }}> {/*Text unter dem Kreis*/}
                                     {step.label}
                                 </div>
                                 <div style={{ fontSize: '10px', color: '#6b7d94', textAlign: 'center', whiteSpace: 'nowrap' }}> {/*Quellenverweis*/}
@@ -258,7 +258,7 @@ function MisuseModal({ misuses, setMisuses, likelihoodScale, impactScale, onClos
                     <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#666' }}>✕</button>
                 </div>
                 <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>
-                    Reasonably foreseeable misuse - EU AI Act Art. 9(2)(b) · Seghid et al. (2026)<br />
+                    Reasonably foreseeable misuse - EU AI Act Art. 9(2)(b)<br />
                     <em>You can add misuse scenarios at any point during the assessment.</em>
                 </p>
 
@@ -386,7 +386,7 @@ function LandingPage({ onStart, onResume }) {
 
     return (
         <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #243652 0%, #1a4a7a 55%, #2b6ca3 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-            <div style={{ maxWidth: '720px', textAlign: 'center', color: 'white' }}>
+            <div style={{ maxWidth: '1000px', textAlign: 'center', color: 'white' }}>
                 <div style={{ fontSize: '13px', letterSpacing: '2px', color: '#4fc3f7', textTransform: 'uppercase', marginBottom: '16px' }}>
                     EU AI Act · Article 9
                 </div>
@@ -397,9 +397,9 @@ function LandingPage({ onStart, onResume }) {
                     A structured risk management process for high-risk AI systems, grounded in ISO 31000:2018, ISO/IEC 23894:2023, NIST SP 800-30, and NIST AI RMF 1.0.
                 </p>
 
-                <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '48px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '48px', flexWrap: 'wrap' }}>
                     {STEPS.map(step => (
-                        <div key={step.id} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(79,195,247,0.3)', borderRadius: '10px', padding: '14px 20px', textAlign: 'center' }}>
+                        <div key={step.id} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(79,195,247,0.3)', borderRadius: '10px', padding: '14px 16px', textAlign: 'center' }}>
                             <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#4fc3f7' }}>{step.label}</div>
                             <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{step.sub}</div>
                         </div>
@@ -439,7 +439,7 @@ function LandingPage({ onStart, onResume }) {
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                                         <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: isComplete ? 'rgba(46,125,50,0.3)' : 'rgba(79,195,247,0.2)', color: isComplete ? '#81c784' : '#4fc3f7', fontWeight: 'bold' }}>
-                                            {isComplete ? '✓ Completed' : `In Progress · Step ${a.current_step}`} //Ist das Assessment abgeschlossen?
+                                            {isComplete ? '✓ Completed' : `In Progress · Step ${a.current_step}`} {/*Ist das Assessment abgeschlossen?*/}
                                         </span>
                                         {isComplete && (() => {  //wenn abgeschlossen
                                             const idx = PHASES.indexOf(a.scope?.phase)
@@ -488,7 +488,7 @@ function interpretFairness(cf) {
         return `This is a low value, meaning gender did not change the outcome very often in this test. Based on a comparable published example, this would count as an acceptable result.`
     }
     const multiple = (cf / threshold).toFixed(1)
-    return `For some applicants, changing only their gender changed the AI's decision. This is ${multiple}x higher than what a comparable published example treats as acceptable, so this points to a fairness problem.`}
+    return `For some applicants, changing only their gender changed the AI's decision. This is ${multiple}x higher than what a comparable published example (IEEE Std 3198-2025, Cl. 7.3.1) treats as acceptable, so this points to a fairness problem.`}
 
 //Precision interpretieren
 function interpretPrecision(precision) {
@@ -511,7 +511,7 @@ function interpretSpecificity(specificity) {
 //F1 interpretieren
 function interpretF1(f1) {
     const pct = Math.round(f1 * 100)
-    return `This score combines the two measures above into one number (${pct}%), to give a quick overall impression.`
+    return `This score combines Precision and Recall into one number (${pct}%), to give a quick overall impression.`
 }
 
 //NIST SP 800-30, Table I-3 (semi-quantitative bins, 0-100 scale)
@@ -536,14 +536,14 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
         const level = scoreToNistLevel(score)
         return {
             level,
-            reason: `The fairness test found a score of ${modelCheckResult.counterfactual_fairness} - meaning gender changed the AI's decision in a notable share of test cases. Based on this, this risk is suggested to be rated as "${level}".`,
+            reason: `The fairness test found a score of ${modelCheckResult.counterfactual_fairness} - meaning gender changed the AI's decision in a notable share of test cases.`,
         }
     }
     if (riskId === 8 && modelCheckResult) {
         const level = scoreToNistLevel((1 - modelCheckResult.accuracy) * 100)
         return {
             level,
-            reason: `The AI got ${Math.round(modelCheckResult.accuracy * 100)}% of test decisions right. Based on this, this risk is suggested to be rated as "${level}".`,
+            reason: `The AI got ${Math.round(modelCheckResult.accuracy * 100)}% of test decisions right.`,
         }
     }
     if (riskId === 2 && occlusionResult) {
@@ -552,7 +552,7 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
         const level = scoreToNistLevel((influential / total) * 100)
         return {
             level,
-            reason: `${influential} out of ${total} pieces of information changed the AI's decision when removed. Based on this, this risk is suggested to be rated as "${level}".`,
+            reason: `${influential} out of ${total} pieces of information changed the AI's decision when removed.`,
         }
     }
     return null
@@ -878,7 +878,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                 <label style={{ ...styles.label, fontSize: '15px', fontWeight: 'bold', color: COLORS.navy, marginTop: '8px' }}>
                     Lifecycle Stage
                 </label>
-                <FieldHint text="The Domain above usually stays the same across re-assessments - this is the field that changes as your AI system moves forward in its lifecycle (ISO/IEC 23894 Annex C)." />
+                <FieldHint text="The Domain above usually stays the same across re-assessments - This is the field that changes as your AI system moves forward in its lifecycle (ISO/IEC 23894 Annex C)." />
                 <select
                     style={{ ...styles.input, borderColor: phaseUnchanged ? '#f9a825' : COLORS.accent }}
                     value={form.phase}
@@ -977,7 +977,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
                 <h3 style={{ marginTop: 0, fontSize: '15px' }}>AI Model Technical Check</h3>
                 <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
                     Runs the connected AI system (Gemma-3-1B via Ollama) against a small test set of credit applications
-                    to measure Accuracy and Counterfactual Fairness. Run this before
+                    to measure Accuracy, Counterfactual Fairness, Precision, Recall, Specificity, and F1-Score. Run this before
                     selecting risks below, so the selection can be informed by the technical evidence.
                 </p>
                 <button
@@ -1539,7 +1539,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                             <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px' }}>
                                 <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#555' }}>
                                     This risk is already assessed as "{risk.level}" - ISO 31000 Cl. 6.5.1 does not require active treatment
-                                    at this level. You can accept it as-is, or choose to treat it anyway.
+                                    at this level. You can accept it, or choose to treat it anyway.
                                 </p>
                                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                     <button
@@ -1580,7 +1580,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                             {risk.id === 10 && simDone[risk.id] && mitigatedResult && (
                                                 <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
                                                     <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
-                                                        Re-ran the test with gender removed from the prompt (Fairness through Unawareness, IEEE Std 3198-2025 Cl. 6.2.1.9)
+                                                        Re-ran the test with gender removed from the prompt
                                                     </p>
                                                     <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
                                                         Counterfactual Fairness: {modelCheckResult ? modelCheckResult.counterfactual_fairness : '?'} → <strong>{mitigatedResult.counterfactual_fairness}</strong>
@@ -1649,7 +1649,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                             }}
                                                         >
                                                             {simulating === risk.id
-                                                                ? (risk.id === 10 ? 'Re-running test... (~30-60s)' : 'Running... (~3-5 min)')
+                                                                ? (risk.id === 10 ? 'Re-running test... (~1-3min)' : 'Running... (~3-5 min)')
                                                                 : simDone[risk.id]
                                                                     ? 'Completed'
                                                                     : `${TREATMENT_SUGGESTIONS[risk.id].simulationButton}`}
@@ -1790,6 +1790,14 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                 <p style={{ margin: 0, fontSize: '13px', color: '#c62828', fontWeight: 'bold' }}>
                                                     Residual risk is still {risk.residualLevel}. Consider refining your treatment measure or choosing a different option before confirming.
                                                 </p>
+                                            </div>
+                                        )}
+
+                                        {/* Warnung wenn keine Verbesserung gegenüber dem Ausgangsniveau */}
+                                        {risk.residualLevel === risk.level && risk.residualLevel !== 'High' && risk.residualLevel !== 'Very High' && (
+                                            <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px' }}>
+                                                <p style={{ margin: 0, fontSize: '13px', color: '#e65100', fontWeight: 'bold' }}>
+                                                    The residual risk ({risk.residualLevel}) remains the same as initially assessed. This indicates that the risk has not decreased, but you can confirm this if you believe no further measurements will aid in its reduction.                                                </p>
                                             </div>
                                         )}
                                     </div>
@@ -2008,7 +2016,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
                     </div>
                 )}
             </div>
-            <NavButtons currentStep={5} onBack={onBack} onNext={finish} nextLabel="✓ Finish" />
+            <NavButtons currentStep={5} onBack={onBack} onNext={finish} nextLabel="Finish" />
         </div>
     )
 }
@@ -2065,6 +2073,11 @@ export default function App() {
     const [mitigatedResult, setMitigatedResult] = useState(null)
     const [extendedValidationResult, setExtendedValidationResult] = useState(null)
     const [occlusionAggregatedResult, setOcclusionAggregatedResult] = useState(null)
+
+    //Beim Pagewechsel oben beginnen
+    useEffect(() => {
+        window.scrollTo(0, 0)
+    }, [currentStep])
 
     //AI Test
     async function runModelCheck() {
