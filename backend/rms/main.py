@@ -244,6 +244,53 @@ def credit_metrics():
 def credit_metrics_mitigated():
     return compute_credit_metrics(omit_field="gender")
 
+#Extended Validation für Risiko 8 - mehrere unabhängige Durchläufe statt einem einzelnen
+@app.get("/credit-metrics-extended")
+def credit_metrics_extended(runs: int = 2):
+    all_results = [compute_credit_metrics() for _ in range(runs)]
+    accuracies = [r["accuracy"] for r in all_results]
+    cf_values = [r["counterfactual_fairness"] for r in all_results]
+
+    avg_accuracy = sum(accuracies) / len(accuracies)
+    avg_cf = sum(cf_values) / len(cf_values)
+    accuracy_range = (min(accuracies), max(accuracies))
+    cf_range = (min(cf_values), max(cf_values))
+
+    return {
+        "runs": runs,
+        "individual_accuracies": accuracies,
+        "individual_cf_values": cf_values,
+        "average_accuracy": round(avg_accuracy, 2),
+        "average_counterfactual_fairness": round(avg_cf, 2),
+        "accuracy_range": [round(accuracy_range[0], 2), round(accuracy_range[1], 2)],
+        "cf_range": [round(cf_range[0], 2), round(cf_range[1], 2)],
+    }
+
+
+#Aggregierte Occlusion für Risiko 2 - über mehrere Antragsteller statt nur einem
+@app.get("/occlusion-aggregated")
+def occlusion_aggregated():
+    field_influence_count = {field: 0 for field in ["age", "gender", "income", "employment", "existing_debt", "requested_amount"]}
+    tested_applicant_ids = [a["id"] for a in CREDIT_APPLICANTS[:3]]  # nur die ersten 3 statt aller 10 - reduziert Laufzeit
+
+    for applicant_id in tested_applicant_ids:
+        result = occlusion_test(applicant_id)
+        for r in result["occlusion_results"]:
+            if r["changed_from_baseline"]:
+                field_influence_count[r["omitted_field"]] += 1
+
+    total_applicants = len(tested_applicant_ids)
+    field_influence_summary = [
+        {"field": field, "influential_count": count, "influential_rate": round(count / total_applicants, 2)}
+        for field, count in field_influence_count.items()
+    ]
+    field_influence_summary.sort(key=lambda x: x["influential_count"], reverse=True)
+
+    return {
+        "total_applicants_tested": total_applicants,
+        "field_influence_summary": field_influence_summary,
+    }
+
 #Occlusion = Testet einen Antragssteller mit je einem fehlenden Feld
 @app.get("/occlusion-test/{applicant_id}")
 def occlusion_test(applicant_id: int):

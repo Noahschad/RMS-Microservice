@@ -13,10 +13,10 @@ const DEFAULT_LIKELIHOOD_SCALE = [
 
 const DEFAULT_IMPACT_SCALE = [
     { value: 'Very Low', score: 0, description: 'The threat event could be expected to have a negligible adverse effect on organizational operations, assets, or individuals.' },
-    { value: 'Low', score: 2, description: 'The threat event could be expected to have a limited adverse effect - minor damage to assets, minor financial loss, or minor harm to individuals.' },
-    { value: 'Moderate', score: 5, description: 'The threat event could be expected to have a serious adverse effect - significant degradation of mission capability or significant harm to individuals.' },
-    { value: 'High', score: 8, description: 'The threat event could be expected to have a severe or catastrophic adverse effect - major damage to assets, major financial loss, or severe harm to individuals.' },
-    { value: 'Very High', score: 10, description: 'The threat event could be expected to have multiple severe or catastrophic adverse effects on operations, assets, and individuals.' },
+    { value: 'Low', score: 2, description: 'The threat event could be expected to have a limited adverse effect - minor damage to organizational assets, minor financial loss, or minor harm to individuals.' },
+    { value: 'Moderate', score: 5, description: 'The threat event could be expected to have a serious adverse effect - significant degradation of mission capability, significant damage to organizational assets, significant financial loss, significant harm to individuals.' },
+    { value: 'High', score: 8, description: 'The threat event could be expected to have a severe or catastrophic adverse effect - major damage to organizational assets, major financial loss, or severe harm to individuals.' },
+    { value: 'Very High', score: 10, description: 'The threat event could be expected to have multiple severe or catastrophic adverse effects on organizational operations, assets, individuals or the Nation.' },
 ]
 
 //NIST SP 800-30 Table I-2 --> Risk Level
@@ -33,52 +33,78 @@ function getRiskLevel(likelihood, impact) {
 
 //Liste der Risk Sources
 const RISK_CATALOG = [
-    { id: 1, title: 'Biased training data', description: 'Training data does not represent the deployment population, leading to unfair outcomes.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'HR & Recruitment', 'Finance', 'Law Enforcement', 'Education'], phases: ['Inception', 'Design and Development'] },
-    { id: 2, title: 'Lack of transparency and explainability', description: 'The AI system cannot explain its decisions to stakeholders.', source: 'ISO/IEC 23894 Annex B.3', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
+    { id: 1, title: 'Biased training data', description: 'Training data does not represent the deployment population, leading to unfair outcomes.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'HR & Recruitment', 'Finance', 'Law Enforcement', 'Education'], phases: ['Inception', 'Design and Development', 'Verification and Validation', 'Re-evaluation'] },
+    { id: 2, title: 'Lack of transparency and explainability', description: 'The AI system cannot explain its decisions to stakeholders.', source: 'ISO/IEC 23894 Annex B.3', domains: ['Healthcare', 'Finance', 'Law Enforcement', 'HR & Recruitment', 'Education'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring', 'Verification and Validation'] },
     { id: 3, title: 'Data quality issues', description: 'Inadequate quality of training and test data affects system functionality and fairness.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Design and Development', 'Verification and Validation'] },
     //{ id: 4, title: 'Unintended misuse of the system', description: 'The AI system is used in a context for which it was not originally designed.', source: 'ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
-    { id: 5, title: 'Over-automation without human oversight', description: 'The system operates with insufficient human control, increasing risk of undetected errors.', source: 'ISO/IEC 23894 Annex B.4', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment'] },
-    { id: 6, title: 'Privacy violation through data processing', description: 'Personal data is processed in ways that violate privacy regulations such as GDPR.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'HR & Recruitment', 'Education', 'Finance'], phases: ['Inception', 'Design and Development', 'Operation and Monitoring'] },
-    { id: 7, title: 'Model degradation over time', description: 'System performance degrades due to data drift or changes in the deployment environment.', source: 'ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Operation and Monitoring', 'Re-evaluation'] },
+    { id: 5, title: 'Over-automation without human oversight', description: 'The system operates with insufficient human control, increasing risk of undetected errors.', source: 'ISO/IEC 23894 Annex B.4; Steimers & Bömer (2021), Sec. 3.1', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment'] },
+    { id: 6, title: 'Privacy violation through data processing', description: 'Personal data is processed in ways that violate privacy regulations such as GDPR.', source: 'Steimers & Bömer (2021), Sec. 3.7', domains: ['Healthcare', 'HR & Recruitment', 'Education', 'Finance'], phases: ['Inception', 'Design and Development', 'Operation and Monitoring'] },
+    { id: 7, title: 'Data and model drift during operation', description: 'Production data can become unrepresentative of the application domain, while continuously learning systems may change their behavior over time and deviate from the initial specification.', source: 'Steimers & Bömer (2021), Sec. 3.1, 3.4; ISO/IEC 23894 Annex B.5', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Operation and Monitoring', 'Re-evaluation'] },
     { id: 8, title: 'Inadequate verification and validation', description: 'Insufficient testing leads to undetected failures when the system is deployed.', source: 'ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Verification and Validation'] },
-    { id: 9, title: 'Adversarial attacks and data poisoning', description: 'Malicious actors manipulate input data or training data to compromise system behavior.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
-    { id: 10, title: 'Discriminatory automated decisions', description: 'The system produces decisions that systematically disadvantage certain groups.', source: 'ISO/IEC 23894 Annex B.3', domains: ['HR & Recruitment', 'Law Enforcement', 'Finance', 'Education'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
+    { id: 9, title: 'Adversarial attacks and data poisoning', description: 'Risks from adversarial attacks, data poisoning, and other manipulation may arise if the data collection process is not secured.', source: 'ISO/IEC 23894 Annex B.5', domains: ['Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
+    { id: 10, title: 'Discriminatory automated decisions', description: 'The system produces decisions that systematically disadvantage certain groups.', source: 'Steimers & Bömer (2021), Sec. 3.8', domains: ['HR & Recruitment', 'Law Enforcement', 'Finance', 'Education'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
     { id: 11, title: 'Hardware and infrastructure failures', description: 'Faults in GPU or cloud hardware during training or operation corrupt model behavior in ways that are difficult to detect.', source: 'Steimers & Bömer (2021), Sec. 3.5', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Design and Development', 'Deployment', 'Operation and Monitoring'] },
     { id: 12, title: 'Inadequate operating environment specification', description: 'The system is deployed in a context that was insufficiently described during development, leading to unexpected failures in operation.', source: 'Steimers & Bömer (2021), Sec. 3.3', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Inception', 'Design and Development'] },
     { id: 13, title: 'Use of technologically immature components', description: 'Deployment of insufficiently mature AI technology in safety-critical contexts introduces unknown or poorly understood risk profiles.', source: 'Steimers & Bömer (2021), Sec. 3.6', domains: ['Healthcare', 'Finance', 'Law Enforcement'], phases: ['Inception', 'Design and Development'] },
     { id: 14, title: 'Hallucination and output unreliability', description: 'The model generates factually incorrect outputs that are presented as correct, with potentially severe consequences in high-stakes decisions.', source: 'Nidhisree et al. (2024), Table I; IBM AI Risk Atlas', domains: ['Healthcare', 'Finance', 'Law Enforcement', 'Education'], phases: ['Deployment', 'Operation and Monitoring'] },
     { id: 15, title: 'Overreliance on AI recommendations', description: 'Users trust AI outputs without critical review and delegate decisions without adequate human judgment.', source: 'Nidhisree et al. (2024), Table I; MIT AI Risk Repository, Subdomain 5.1', domains: ['Healthcare', 'Finance', 'Education'], phases: ['Deployment', 'Operation and Monitoring'] },
-    { id: 16, title: 'Disinformation and manipulation at scale', description: 'AI systems are deliberately used to generate and spread false information or to manipulate affected individuals at scale.', source: 'MIT AI Risk Repository, Subdomain 4.1', domains: ['Law Enforcement', 'Education', 'HR & Recruitment'], phases: ['Deployment', 'Operation and Monitoring'] },
+    { id: 16, title: 'Disinformation and manipulation at scale', description: 'AI systems are used to generate and spread false information or to manipulate affected individuals at scale.', source: 'MIT AI Risk Repository, Subdomain 4.1', domains: ['Law Enforcement', 'Education', 'HR & Recruitment'], phases: ['Deployment', 'Operation and Monitoring'] },
     { id: 17, title: 'Loss of human agency in automated decisions', description: 'Affected persons progressively lose the ability to understand, contest, or influence decisions made by AI systems.', source: 'MIT AI Risk Repository, Subdomain 5.2', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
     { id: 18, title: 'Prompt injection and model behavior manipulation', description: 'Malicious inputs exploit LLM inference to override intended behavior and produce harmful or unintended outputs.', source: 'IBM AI Risk Atlas: Prompt attacks; Model-behavior manipulation', domains: ['Finance', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
-    { id: 19, title: 'Lack of AI governance and accountability structures', description: 'Absent or insufficient ownership, accountability, and documentation structures make compliance verification and auditing impossible.', source: 'IBM AI Risk Atlas: Governance; MIT AI Risk Repository, Subdomain 6.5', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Deployment', 'Operation and Monitoring'] },
+    { id: 19, title: 'Lack of AI governance and legal accountability', description: 'Absent or insufficient ownership, accountability, and documentation structures make compliance verification and auditing impossible.', source: 'IBM AI Risk Atlas: Governance; MIT AI Risk Repository, Subdomain 6.5', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Deployment', 'Operation and Monitoring'] },
 ]
 
 //Scope & Criteria
 const PHASES = ['Inception', 'Design and Development', 'Verification and Validation', 'Deployment', 'Operation and Monitoring', 'Re-evaluation', 'Retirement or Replacement']
 const DOMAINS = ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement']
 
-//Misuse
+//Misuse (Seghid et al. --> Table 2 --> nicht alle absichtlich enthalten)
 const MISUSE_CATEGORIES = [
-    'Use beyond intended scope',
-    'Adversarial attack / prompt injection',
+    'Use beyond intended scope', //ISO/IEC 23894 Annex B.7 (Reuse)
+    'Adversarial threats',
     'Privacy violation through unauthorized use',
     'Disinformation & deception',
-    'Overreliance by uninformed user',
+    //'Overreliance by uninformed user', (zu nah an Risiko 15)
     'Bias amplification through misuse',
     'Psychological manipulation',
+    'Socioeconomic Exploitation & Inequality',
+    'Autonomy & Weaponization'
 ]
 
-//Automatisierter Vorschlage für Risk Treatment von "Discriminatory decisions"
+//Beispiele
+const MISUSE_CATEGORY_EXAMPLES = {
+    'Use beyond intended scope': 'Example: a system built to detect faces in social media photos gets reused to identify suspects in surveillance footage.',
+    'Adversarial threats': 'Example: Evasion attacks, poisoning, backdoors, model extraction, membership inference, model inversion, supply chain attacks',
+    'Privacy violation through unauthorized use': 'Example: Sensitive attribute inference, re-identification, data leakage, unauthorized surveillance',
+    'Disinformation & deception': 'Example: Deepfakes, automated fake news, targeted propaganda, harmful/illegal content generation, prompt injection, erosion of trust',
+    'Bias amplification through misuse': 'Example: Gender, racial, socioeconomic biases, opaque decision-making, stereotyping',
+    'Psychological manipulation': 'Example: Emotional manipulation via AI, addiction to AI interfaces, mental health impacts',
+    'Socioeconomic Exploitation & Inequality': 'Example: Job displacement, economic fraud, cheating, microtargeting, exploitation of vulnerable populations',
+    'Autonomy & Weaponization': 'Example: Autonomous drones, lethal AI weapons, cyber-physical attacks, Agentic AI systems',
+}
+
+//Automatisierte Vorschläge für Risk Treatment
 const TREATMENT_SUGGESTIONS = {
     10: {
         option: 'Remove risk source',
-        note: 'Apply fairness constraints during training and conduct regular disparate impact audits post-deployment.',
+        note: 'Test the AI again without telling it the applicant\'s gender, and check whether this reduces unfair treatment.',
         hasSimulation: true,
         simulationButton: 'Apply Fairness Constraints',
-        simulationResult: 'Fairness check complete. Affected borrower groups identified and corrected. Loan approval rate gap reduced from 31% to 5%.',
-        simulationResidualLikelihood: 'Low',
-        simulationResidualImpact: 'Moderate',
+        //simulationResult: 'Fairness check complete. Affected borrower groups identified and corrected. Loan approval rate gap reduced from 31% to 5%.',
+        //simulationResidualLikelihood: 'Low',
+        //simulationResidualImpact: 'Moderate',
+    },
+    8: {
+        option: 'Change likelihood',
+        note: 'Test the AI multiple times instead of just once, and look at the average and how much the results vary - this makes it less likely that a bad result goes unnoticed just because we only tested once.',
+        hasSimulation: true,
+        simulationButton: 'Run Extended Validation (2 runs, ~3-5 min)',
+    },
+    2: {
+        option: 'Change likelihood',
+        note: 'Test which piece of information matters most across several example applicants instead of just one, to see if the same answer keeps coming up - this makes the explanation more trustworthy.',
+        hasSimulation: true,
+        simulationButton: 'Run Occlusion Across Applicants (~3-5 min)',
     },
 }
 
@@ -86,9 +112,9 @@ const TREATMENT_SUGGESTIONS = {
 const STEPS = [
     { id: 1, label: 'Scope & Criteria', sub: 'ISO 31000 Cl. 6.3' },
     { id: 2, label: 'Risk Identification', sub: 'ISO/IEC 23894 Cl. 6.4.2' },
-    { id: 3, label: 'Risk Evaluation', sub: 'ISO/IEC 23894 Cl. 6.4.3' },
-    { id: 4, label: 'Treatment', sub: 'ISO 31000 Cl. 6.5' },
-    { id: 5, label: 'Report', sub: 'EU AI Act Art. 9' },
+    { id: 3, label: 'Risk Analysis', sub: 'ISO/IEC 23894 Cl. 6.4.3' },
+    { id: 4, label: 'Risk Treatment', sub: 'ISO 31000 Cl. 6.5' },
+    { id: 5, label: 'Report', sub: 'ISO 31000 Cl. 6.7' },
 ]
 
 //Hilfsfunktion für die Farbe
@@ -108,12 +134,12 @@ const COLORS = {
     cardBorder: '#a8c8e0',
 }
 
-//Schritte 1-5
+//Schritte 1-5 --> 5 kreise nebneinander als Übersicht
 function Stepper({ currentStep, onStepClick }) {
     return (
         <div style={styles.stepperWrap}>
             <div style={styles.stepperInner}>
-                {STEPS.map((step, idx) => {
+                {STEPS.map((step, idx) => { //durch Steps Array durchgehen
                     const isActive = step.id === currentStep
                     const isDone = step.id < currentStep
                     return (
@@ -122,7 +148,7 @@ function Stepper({ currentStep, onStepClick }) {
                                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: isDone ? 'pointer' : 'default' }}
                                 onClick={() => isDone && onStepClick(step.id)}
                             >
-                                <div style={{
+                                <div style={{ //Kreis mit Zahl
                                     width: '36px', height: '36px', borderRadius: '50%',
                                     background: isActive ? '#1a1a2e' : isDone ? '#4fc3f7' : '#e0e0e0',
                                     color: isActive || isDone ? 'white' : '#999',
@@ -132,10 +158,10 @@ function Stepper({ currentStep, onStepClick }) {
                                 }}>
                                     {isDone ? '✓' : step.id}
                                 </div>
-                                <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: isActive ? 'bold' : 'normal', color: isActive ? '#1a1a2e' : isDone ? '#4fc3f7' : '#999', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: isActive ? 'bold' : 'normal', color: isActive ? '#1a1a2e' : isDone ? '#4fc3f7' : '#999', textAlign: 'center', whiteSpace: 'nowrap' }}> //Text unter dem Kreis
                                     {step.label}
                                 </div>
-                                <div style={{ fontSize: '10px', color: '#6b7d94', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontSize: '10px', color: '#6b7d94', textAlign: 'center', whiteSpace: 'nowrap' }}> {/*Quellenverweis*/}
                                     {step.sub}
                                 </div>
                             </div>
@@ -214,7 +240,7 @@ function MisuseModal({ misuses, setMisuses, likelihoodScale, impactScale, onClos
     function update(id, field, value) {
         setMisuses(misuses.map(m => {
             if (m.id !== id) return m
-            const updated = { ...m, [field]: value }
+            const updated = {...m, [field]: value}
             updated.level = getRiskLevel(updated.likelihood, updated.impact)
             return updated
         }))
@@ -250,12 +276,13 @@ function MisuseModal({ misuses, setMisuses, likelihoodScale, impactScale, onClos
                                 <label style={styles.label}>Category</label>
                                 <span style={{ ...styles.badge, background: c.bg, color: c.text }}>{m.level}</span>
                             </div>
-                            <select style={{ ...styles.input, marginBottom: '10px' }} value={m.category} onChange={e => update(m.id, 'category', e.target.value)}>
+                            <select style={{ ...styles.input, marginBottom: '4px' }} value={m.category} onChange={e => update(m.id, 'category', e.target.value)}>
                                 {MISUSE_CATEGORIES.map(cat => <option key={cat}>{cat}</option>)}
                             </select>
+                            <FieldHint text={MISUSE_CATEGORY_EXAMPLES[m.category]} />
                             <textarea
                                 style={{ ...styles.input, height: '70px', resize: 'vertical', marginBottom: '10px' }}
-                                placeholder="Describe the foreseeable misuse scenario..."
+                                placeholder="Describe the foreseeable misuse scenario"
                                 value={m.description}
                                 onChange={e => update(m.id, 'description', e.target.value)}
                             />
@@ -282,7 +309,7 @@ function MisuseModal({ misuses, setMisuses, likelihoodScale, impactScale, onClos
     )
 }
 
-//Scope & Criteria
+//Scope & Criteria --> Tabellen Editieren
 function EditableScaleTable({ scale, setScale, title, source, note }) {
     const [editingIndex, setEditingIndex] = useState(null)
     const [editValue, setEditValue] = useState('')
@@ -367,19 +394,14 @@ function LandingPage({ onStart, onResume }) {
                     Risk Management System
                 </h1>
                 <p style={{ fontSize: '18px', color: '#ccc', marginBottom: '32px', lineHeight: 1.6 }}>
-                    A structured risk management process for high-risk AI systems, grounded in ISO 31000:2018, ISO/IEC 23894:2023, and NIST SP 800-30.
+                    A structured risk management process for high-risk AI systems, grounded in ISO 31000:2018, ISO/IEC 23894:2023, NIST SP 800-30, and NIST AI RMF 1.0.
                 </p>
 
                 <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '48px', flexWrap: 'wrap' }}>
-                    {[
-                        { label: 'Scope & Criteria', desc: 'ISO 31000 Cl. 6.3' },
-                        { label: 'Risk Assessment', desc: 'ISO/IEC 23894 Cl. 6.4' },
-                        { label: 'Treatment', desc: 'ISO 31000 Cl. 6.5' },
-                        { label: 'Reporting', desc: 'EU AI Act Annex IV' },
-                    ].map(item => (
-                        <div key={item.label} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(79,195,247,0.3)', borderRadius: '10px', padding: '14px 20px', textAlign: 'center' }}>
-                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#4fc3f7' }}>{item.label}</div>
-                            <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{item.desc}</div>
+                    {STEPS.map(step => (
+                        <div key={step.id} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(79,195,247,0.3)', borderRadius: '10px', padding: '14px 20px', textAlign: 'center' }}>
+                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#4fc3f7' }}>{step.label}</div>
+                            <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>{step.sub}</div>
                         </div>
                     ))}
                 </div>
@@ -394,7 +416,7 @@ function LandingPage({ onStart, onResume }) {
                     Grounded in ISO 31000:2018 · ISO/IEC 23894:2023 · NIST SP 800-30 · NIST AI RMF 1.0
                 </p>
                 {/* Assessments Liste */}
-                {!loading && assessments.length > 0 && (
+                {!loading && assessments.length > 0 && ( //Bedingungen fürs Anzeigen der Assessments Liste
                     <div style={{ marginTop: '48px', textAlign: 'left' }}>
                         <h3 style={{ color: '#4fc3f7', fontSize: '14px', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '16px' }}>
                             Resume an Assessment
@@ -417,9 +439,9 @@ function LandingPage({ onStart, onResume }) {
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                                         <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: isComplete ? 'rgba(46,125,50,0.3)' : 'rgba(79,195,247,0.2)', color: isComplete ? '#81c784' : '#4fc3f7', fontWeight: 'bold' }}>
-                                            {isComplete ? '✓ Completed' : `In Progress · Step ${a.current_step}`}
+                                            {isComplete ? '✓ Completed' : `In Progress · Step ${a.current_step}`} //Ist das Assessment abgeschlossen?
                                         </span>
-                                        {isComplete && (() => {
+                                        {isComplete && (() => {  //wenn abgeschlossen
                                             const idx = PHASES.indexOf(a.scope?.phase)
                                             const pending = idx >= 0 ? PHASES.slice(idx + 1) : []
                                             const pendingLabel = pending.length > 2
@@ -455,42 +477,41 @@ function LandingPage({ onStart, onResume }) {
 
 //Accuracy interpretieren
 function interpretAccuracy(accuracy) {
-    const chanceLevelNote = accuracy <= 0.5 ? " That's around chance level for a yes/no decision." : ""
-    return `${Math.round(accuracy * 100)}% of decisions matched the ground truth in this small test.${chanceLevelNote} There's no fixed accuracy number required by law for this - it is something we define and justify ourselves for this project.`
+    const chanceLevelNote = accuracy <= 0.5 ? " That is about as good as guessing." : ""
+    return `The AI got ${Math.round(accuracy * 100)}% of decisions right in this small test.${chanceLevelNote} There is no legally required minimum for this number.`
 }
 
 //Fairness interpretieren
 function interpretFairness(cf) {
     const threshold = 0.1
     if (cf <= threshold) {
-        return `At or below ${threshold} (the threshold demonstrated for this metric family in IEEE Std 3198-2025, Cl. 7.3.1), meaning the fairness requirement would be considered met in that reference example - though n=5 pairs is a small sample.`
+        return `This is a low value, meaning gender did not change the outcome very often in this test. Based on a comparable published example, this would count as an acceptable result.`
     }
     const multiple = (cf / threshold).toFixed(1)
-    return `Above the ${threshold} threshold demonstrated in IEEE Std 3198-2025 (Cl. 7.3.1) for this metric family - about ${multiple}x that reference value. In that worked example, exceeding this threshold means the fairness requirement is not met.`
-}
+    return `For some applicants, changing only their gender changed the AI's decision. This is ${multiple}x higher than what a comparable published example treats as acceptable, so this points to a fairness problem.`}
 
 //Precision interpretieren
 function interpretPrecision(precision) {
     const pct = Math.round(precision * 100)
-    return `Of all applicants the model approved, ${pct}% actually should have been approved according to ground truth.`
+    return `When the AI approved someone, it was right ${pct}% of the time (i.e. that person really should have been approved).`
 }
 
 //Recall interpretieren
 function interpretRecall(recall) {
     const pct = Math.round(recall * 100)
-    return `Of all applicants who should have been approved, the model correctly approved ${pct}% of them. Aji & Dhini (2019) highlight this kind of measure as more important than plain Accuracy in credit scoring.`
+    return `Of all applicants who really should have been approved, the AI correctly approved ${pct}% of them.`
 }
 
 //Specificity interpretieren
 function interpretSpecificity(specificity) {
     const pct = Math.round(specificity * 100)
-    return `Of all applicants who should have been rejected, the model correctly rejected ${pct}% of them.`
+    return `Of all applicants who really should have been rejected, the AI correctly rejected ${pct}% of them.`
 }
 
 //F1 interpretieren
 function interpretF1(f1) {
     const pct = Math.round(f1 * 100)
-    return `F1 combines Precision and Recall into one score (${pct}%).`
+    return `This score combines the two measures above into one number (${pct}%), to give a quick overall impression.`
 }
 
 //NIST SP 800-30, Table I-3 (semi-quantitative bins, 0-100 scale)
@@ -515,33 +536,31 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
         const level = scoreToNistLevel(score)
         return {
             level,
-            reason: `Counterfactual Fairness measured at ${modelCheckResult.counterfactual_fairness} (${score.toFixed(0)}/100 on the NIST SP 800-30 Table I-3 scale) - suggesting Likelihood/Impact of "${level}".`,
+            reason: `The fairness test found a score of ${modelCheckResult.counterfactual_fairness} - meaning gender changed the AI's decision in a notable share of test cases. Based on this, this risk is suggested to be rated as "${level}".`,
         }
     }
     if (riskId === 8 && modelCheckResult) {
-        const errorRate = (1 - modelCheckResult.accuracy) * 100
-        const level = scoreToNistLevel(errorRate)
+        const level = scoreToNistLevel((1 - modelCheckResult.accuracy) * 100)
         return {
             level,
-            reason: `Accuracy measured at ${Math.round(modelCheckResult.accuracy * 100)}% (error rate ${errorRate.toFixed(0)}/100 on the NIST SP 800-30 Table I-3 scale) - suggesting Likelihood/Impact of "${level}".`,
+            reason: `The AI got ${Math.round(modelCheckResult.accuracy * 100)}% of test decisions right. Based on this, this risk is suggested to be rated as "${level}".`,
         }
     }
     if (riskId === 2 && occlusionResult) {
         const total = occlusionResult.occlusion_results.length
         const influential = occlusionResult.occlusion_results.filter(r => r.changed_from_baseline).length
-        const score = (influential / total) * 100
-        const level = scoreToNistLevel(score)
+        const level = scoreToNistLevel((influential / total) * 100)
         return {
             level,
-            reason: `Occlusion test showed ${influential} of ${total} fields changed the decision when removed (${score.toFixed(0)}/100 on the NIST SP 800-30 Table I-3 scale) - suggesting Likelihood/Impact of "${level}".`,
+            reason: `${influential} out of ${total} pieces of information changed the AI's decision when removed. Based on this, this risk is suggested to be rated as "${level}".`,
         }
     }
     return null
 }
 
-function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult, onClose }) {
-    const [showMitigated, setShowMitigated] = useState(false)
-    const displayedResult = showMitigated && mitigatedResult ? mitigatedResult : modelCheckResult
+function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult, extendedValidationResult, occlusionAggregatedResult, onClose }) {
+    const [activeView, setActiveView] = useState('original')
+    const displayedResult = activeView === 'mitigated' && mitigatedResult ? mitigatedResult : modelCheckResult
 
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'stretch', justifyContent: 'flex-end' }}>
@@ -550,36 +569,61 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult,
                     <h2 style={{ margin: 0, fontSize: '20px' }}>AI Model Check Details</h2>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#666' }}>✕</button>
                 </div>
-                <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>
-                    {showMitigated
-                        ? 'Results after re-running the test with gender removed (Fairness through Unawareness).'
-                        : 'Original results from the last run in Risk Identification.'}
+                <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>   {/*4 Bedingungen - genau eine ist wahr*/}
+                    {activeView === 'mitigated' && 'Tested again without showing the AI the applicant\'s gender.'}
+                    {activeView === 'extended' && 'Tested the AI several times instead of once.'}
+                    {activeView === 'occlusionAgg' && 'Checked several applicants instead of just one.'}
+                    {activeView === 'original' && 'The first test result, from the Risk Identification step.'}
                 </p>
 
-                {mitigatedResult && (
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                    <button
+                        onClick={() => setActiveView('original')}
+                        style={{
+                            ...styles.buttonOutline, marginTop: 0, fontSize: '12px',
+                            background: activeView === 'original' ? '#1a1a2e' : 'white',
+                            color: activeView === 'original' ? 'white' : '#1a1a2e',
+                        }}
+                    >
+                        Original Results
+                    </button>
+                    {mitigatedResult && (   //nur wenn migitatedResult nicht null ist
                         <button
-                            onClick={() => setShowMitigated(false)}
+                            onClick={() => setActiveView('mitigated')}
                             style={{
                                 ...styles.buttonOutline, marginTop: 0, fontSize: '12px',
-                                background: !showMitigated ? '#1a1a2e' : 'white',
-                                color: !showMitigated ? 'white' : '#1a1a2e',
+                                background: activeView === 'mitigated' ? '#1a1a2e' : 'white',
+                                color: activeView === 'mitigated' ? 'white' : '#1a1a2e',
                             }}
                         >
-                            ← Original Results
+                            After Fairness Fix
                         </button>
+                    )}
+                    {extendedValidationResult && (  //nur wenn extendedValidationResult nicht null ist
                         <button
-                            onClick={() => setShowMitigated(true)}
+                            onClick={() => setActiveView('extended')}
                             style={{
                                 ...styles.buttonOutline, marginTop: 0, fontSize: '12px',
-                                background: showMitigated ? '#1a1a2e' : 'white',
-                                color: showMitigated ? 'white' : '#1a1a2e',
+                                background: activeView === 'extended' ? '#1a1a2e' : 'white',
+                                color: activeView === 'extended' ? 'white' : '#1a1a2e',
                             }}
                         >
-                            After Mitigation →
+                            Multiple Tests
                         </button>
-                    </div>
-                )}
+                    )}
+                    {occlusionAggregatedResult && ( //nur wenn occlusionAggregatedResult nicht null ist
+                        <button
+                            onClick={() => setActiveView('occlusionAgg')}
+                            style={{
+                                ...styles.buttonOutline, marginTop: 0, fontSize: '12px',
+                                background: activeView === 'occlusionAgg' ? '#1a1a2e' : 'white',
+                                color: activeView === 'occlusionAgg' ? 'white' : '#1a1a2e',
+                            }}
+                        >
+                            Multiple Applicants
+                        </button>
+                    )}
+                </div>
 
                 {!modelCheckResult && !occlusionResult && (
                     <p style={{ color: '#aaa', fontSize: '13px', textAlign: 'center', marginTop: '40px' }}>
@@ -587,7 +631,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult,
                     </p>
                 )}
 
-                {displayedResult && (
+                {(activeView === 'original' || activeView === 'mitigated') && displayedResult && (
                     <>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                             <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
@@ -634,8 +678,8 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult,
                         </div>
                     </>
                 )}
-
-                {occlusionResult && (
+                {/*Occlusion Tabelle*/}
+                {activeView === 'original' && occlusionResult && (
                     <div>
                         <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Occlusion (Applicant #{occlusionResult.applicant_id})</h3>
                         <p style={{ fontSize: '13px', marginBottom: '10px' }}>
@@ -665,6 +709,49 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult,
                         </table>
                     </div>
                 )}
+                {/*Extenden Validation Ansicht*/}
+                {activeView === 'extended' && extendedValidationResult && (
+                    <div>
+                        <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Testing the AI multiple times</h3>
+                        <p style={{ fontSize: '13px', marginBottom: '10px' }}>
+                            Results per test: {extendedValidationResult.individual_accuracies.map(a => `${Math.round(a * 100)}%`).join(', ')}
+                        </p>
+                        <p style={{ fontSize: '13px', marginBottom: '10px' }}>
+                            Average: <strong>{Math.round(extendedValidationResult.average_accuracy * 100)}%</strong> correct
+                            (between {Math.round(extendedValidationResult.accuracy_range[0] * 100)}% and {Math.round(extendedValidationResult.accuracy_range[1] * 100)}%)
+                        </p>
+                        <p style={{ fontSize: '13px', color: '#5a5a5a' }}>
+                            {(extendedValidationResult.accuracy_range[1] - extendedValidationResult.accuracy_range[0]) > 0.15
+                                ? 'The results changed quite a bit between tests - a single test alone would not be reliable enough.'
+                                : 'The results stayed fairly similar every time we tested.'}
+                        </p>
+                    </div>
+                )}
+                {/*Occlusion Aggregated Ansicht*/}
+                {activeView === 'occlusionAgg' && occlusionAggregatedResult && (
+                    <div>
+                        <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Checking multiple example applicants</h3>
+                        <p style={{ fontSize: '13px', marginBottom: '10px' }}>
+                            We checked {occlusionAggregatedResult.total_applicants_tested} example applicants.
+                        </p>
+                        <table style={styles.table}>
+                            <thead>
+                            <tr>
+                                <th style={styles.th}>Piece of information</th>
+                                <th style={styles.th}>Mattered for how many applicants?</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {occlusionAggregatedResult.field_influence_summary.map(f => (
+                                <tr key={f.field}>
+                                    <td style={styles.td}>{f.field}</td>
+                                    <td style={styles.td}>{f.influential_count} of {occlusionAggregatedResult.total_applicants_tested} ({Math.round(f.influential_rate * 100)}%)</td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div>
     )
@@ -674,7 +761,7 @@ function FieldHint({ text }) {
     return <p style={{ fontSize: '12px', color: '#5a5a5a', margin: '2px 0 6px' }}>{text}</p>
 }
 
-//Muss vom User ausgefüllt werden
+//Startformular - Muss vom User ausgefüllt werden
 function UserForm({ onBegin }) {
     const [form, setForm] = useState({ assessorName: '', role: '', aiSystemName: '', date: new Date().toISOString().split('T')[0] })
     const isValid = form.assessorName.trim() && form.role.trim() && form.aiSystemName.trim() && form.date
@@ -725,6 +812,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
     const isReassessment = !!previousPhase
     const phaseUnchanged = isReassessment && form.phase === previousPhase
 
+    //Speicherfunktion --> PUT Anfrage ans Backend
     async function save() {
         setScope(form)
         try {
@@ -749,6 +837,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
             <h1 style={styles.heading}>Scope & Criteria</h1>
             <p style={styles.sub}>Define the context of the AI system under assessment - ISO 31000 Cl. 6.3 · ISO/IEC 23894 Cl. 6.3</p>
 
+            {/*Erneute Bewertung*/}
             {isReassessment && (
                 <div style={{ ...styles.card, marginBottom: '16px', background: '#fff8e1', border: '1px solid #f9a825' }}>
                     <p style={{ margin: 0, fontSize: '13px', color: '#8d6e00' }}>
@@ -812,6 +901,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                 )}
             </div>
 
+            {/*Likelihood/Impact Tabellen*/}
             <EditableScaleTable scale={likelihoodScale} setScale={setLikelihoodScale} title="Likelihood Scale" source="NIST SP 800-30 Table G-3" note="Used to assess the likelihood of each identified risk. Definitions can be adapted to organisational context." />
             <EditableScaleTable scale={impactScale} setScale={setImpactScale} title="Impact Scale" source="NIST SP 800-30 Table H-3" note="Used to assess the impact across organisational, individual, and societal dimensions (ISO/IEC 23894 Cl. 6.4.3.2)." />
 
@@ -822,6 +912,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
 
 //Risiken hinzufügen
 function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, onNext, modelCheckLoading, modelCheckResult, modelCheckError, runModelCheck, occlusionApplicantId, setOcclusionApplicantId, occlusionLoading, occlusionResult, occlusionError, runOcclusionTest,}) {
+    //Filtern der Risiken anhand domain und phase
     const filtered = RISK_CATALOG.filter(r =>
         (!scope.domain || r.domains.includes(scope.domain)) &&
         (!scope.phase || r.phases.includes(scope.phase))
@@ -831,6 +922,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
         return bHasEvidence - aHasEvidence
     })
 
+    //Risiken auswählen
     function toggle(risk) {
         if (risks.find(r => r.id === risk.id)) {
             setRisks(risks.filter(r => r.id !== risk.id))
@@ -850,6 +942,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
         }
     }
 
+    //Risikoliste ans Backend senden
     async function saveAndContinue() {
         try {
             await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
@@ -932,6 +1025,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
 
                 {modelCheckResult && (
                     <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                        {/*Jedes der Kästchen ernscheint nur wenn Wert nicht null ist*/}
                         {modelCheckResult.precision !== null && (
                             <div style={{ padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
                                 <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Precision</div>
@@ -979,6 +1073,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
                     </div>
                 )}
 
+                {/*unklare Antworten*/}
                 {modelCheckResult && modelCheckResult.unclear_count > 0 && (
                     <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px' }}>
                         <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
@@ -1061,7 +1156,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
                     </div>
                 )}
             </div>
-
+            {/*Falls gar keine Risiken, statt leerer Seite*/}
             {filtered.length === 0 && <div style={styles.card}><p>No risks found for the selected context. Please adjust your scope.</p></div>}
 
             {filtered.map(risk => {
@@ -1090,7 +1185,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
                     </div>
                 )
             })}
-
+            {/*Blockieren solange gar kein Risiko ausgewählt ist*/}
             <NavButtons currentStep={2} onBack={onBack} onNext={saveAndContinue} nextDisabled={risks.length === 0} nextLabel={`Continue with ${risks.length} risk${risks.length !== 1 ? 's' : ''} →`} />
         </div>
     )
@@ -1099,7 +1194,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
 //Risk level Berechnung
 function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel }) {
     const [appliedSuggestions, setAppliedSuggestions] = useState({})
-
+    //Einzelnes Feld ändern
     function update(id, field, value) {
         setRisks(risks.map(r => {
             if (r.id !== id) return r
@@ -1108,7 +1203,7 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
             return updated
         }))
     }
-
+    //Beide Felder ändern
     function updateBoth(id, likelihood, impact) {
         setRisks(risks.map(r => {
             if (r.id !== id) return r
@@ -1117,6 +1212,7 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
         setAppliedSuggestions(prev => ({ ...prev, [id]: true }))
     }
 
+    //Backend-Verbindung
     async function saveAndContinue() {
         try {
             await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
@@ -1159,7 +1255,7 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
                             </div>
                             <span style={{ ...styles.badge, background: c.bg, color: c.text, whiteSpace: 'nowrap', marginLeft: '16px' }}>{risk.level}</span>
                         </div>
-
+                        {/*Nur bei Risiken 10,8,2*/}
                         {suggestion && (
                             <div style={{ background: '#fff8e1', border: '1px solid #f9a825', borderRadius: '6px', padding: '12px', marginBottom: '14px' }}>
                                 <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#8d6e00' }}>
@@ -1223,10 +1319,12 @@ const TREATMENT_OPTION_EXPLANATIONS= {
     'Retain the risk by informed decision': 'Knowingly accepting the risk as-is, based on an informed trade-off between benefit and risk.',
 }
 
-function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel, mitigatedResult, setMitigatedResult }) {
+//Treatment Seite
+function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel, mitigatedResult, setMitigatedResult, extendedValidationResult, setExtendedValidationResult, occlusionAggregatedResult, setOcclusionAggregatedResult }) {
     const [simulating, setSimulating] = useState(null) //speichert die ID des Risikos
     const [simDone, setSimDone] = useState({}) //speichert welche Simulationen bereits abgeschlossen sind
     const [mitigationError, setMitigationError] = useState(null)
+
     const [manualOverride, setManualOverride] = useState({})
     const [treatAnyway, setTreatAnyway] = useState({})
     const [editingApplied, setEditingApplied] = useState({})
@@ -1234,30 +1332,69 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
 
     const allGreen = risks.every(r => r.treatmentStatus === 'confirmed')
 
-
+    //Backendaufrufe
     async function runSimulation(id) {
         const suggestion = TREATMENT_SUGGESTIONS[id]
         if (!suggestion?.hasSimulation) return
 
-        setSimulating(id) //Ladeanimation starten
+        setSimulating(id)
         setMitigationError(null)
 
+        //Die 3 Risiken
         try {
-            const response = await fetch('http://127.0.0.1:8000/credit-metrics-mitigated') //Echter Aufruf
-            if (!response.ok) throw new Error('Backend returned an error')
-            const data = await response.json()
-            setMitigatedResult(data)
+            if (id === 10) {
+                const response = await fetch('http://127.0.0.1:8000/credit-metrics-mitigated')
+                if (!response.ok) throw new Error('Backend returned an error')
+                const data = await response.json()
+                setMitigatedResult(data)
 
-            const newLevel = data.counterfactual_fairness > 0.1 ? 'Moderate' : 'Low' //Wirkliches Ergebnis
-            setRisks(risks.map(r => r.id !== id ? r : {
-                ...r,
-                treatmentOption: suggestion.option,
-                treatmentNote: suggestion.note,
-                residualLikelihood: newLevel,
-                residualImpact: newLevel,
-                residualLevel: getRiskLevel(newLevel, newLevel),
-                treatmentStatus: 'suggested',
-            }))
+                const newLevel = data.counterfactual_fairness > 0.1 ? 'Moderate' : 'Low'
+                setRisks(risks.map(r => r.id !== id ? r : {
+                    ...r,
+                    treatmentOption: suggestion.option,
+                    treatmentNote: suggestion.note,
+                    residualLikelihood: newLevel,
+                    residualImpact: newLevel,
+                    residualLevel: getRiskLevel(newLevel, newLevel),
+                    treatmentStatus: 'suggested',
+                }))
+            } else if (id === 8) {
+                const response = await fetch('http://127.0.0.1:8000/credit-metrics-extended')
+                if (!response.ok) throw new Error('Backend returned an error')
+                const data = await response.json()
+                setExtendedValidationResult(data)
+
+                //Je größer die Schwankung (Range), desto höher das Restrisiko
+                const spread = data.accuracy_range[1] - data.accuracy_range[0]
+                const newLevel = spread > 0.15 ? 'Moderate' : 'Low'
+                setRisks(risks.map(r => r.id !== id ? r : {
+                    ...r,
+                    treatmentOption: suggestion.option,
+                    treatmentNote: suggestion.note,
+                    residualLikelihood: newLevel,
+                    residualImpact: newLevel,
+                    residualLevel: getRiskLevel(newLevel, newLevel),
+                    treatmentStatus: 'suggested',
+                }))
+            } else if (id === 2) {
+                const response = await fetch('http://127.0.0.1:8000/occlusion-aggregated')
+                if (!response.ok) throw new Error('Backend returned an error')
+                const data = await response.json()
+                setOcclusionAggregatedResult(data)
+
+                //Wenn ein Merkmal konsistent (>=60%) einflussreich ist, gilt das Muster als stabiler -> geringeres Risiko
+                const topRate = data.field_influence_summary[0]?.influential_rate || 0
+                const newLevel = topRate >= 0.6 ? 'Low' : 'Moderate'
+                setRisks(risks.map(r => r.id !== id ? r : {
+                    ...r,
+                    treatmentOption: suggestion.option,
+                    treatmentNote: suggestion.note,
+                    residualLikelihood: newLevel,
+                    residualImpact: newLevel,
+                    residualLevel: getRiskLevel(newLevel, newLevel),
+                    treatmentStatus: 'suggested',
+                }))
+            }
             setSimDone(prev => ({ ...prev, [id]: true }))
         } catch (error) {
             console.error('Mitigation check failed:', error)
@@ -1266,7 +1403,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
 
         setSimulating(null)
     }
-
+    //Risiken ohne Simulation
     function applyAuto(id) {
         const suggestion = TREATMENT_SUGGESTIONS[id]
         if (!suggestion) return
@@ -1331,12 +1468,13 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
         }))
     }
 
+    //Speichern
     async function saveAndContinue() {
         try {
             await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ current_step: 5 }),
+                body: JSON.stringify({ current_step: 5, risks: risks }),
             })
         } catch (error) {
             console.error('Failed to save treatment step:', error)
@@ -1422,13 +1560,13 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
 
                         {showFullProcess && risk.treatmentStatus !== 'confirmed' && (
                             <>
-                                {/* Phase 1 - Treatment definieren */}
+                                {/*Phase 1 - Treatment definieren*/}
                                 <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px', marginBottom: '14px' }}>
                                     <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 'bold', color: '#1a1a2e' }}>
                                         Phase 1 - Define Treatment Measure
                                     </p>
 
-                                    {/* Auto-Suggestion */}
+                                    {/*Auto-Suggestion bei den 3 Risiken*/}
                                     {TREATMENT_SUGGESTIONS[risk.id] && (
                                         <div style={{ background: 'rgba(79,195,247,0.08)', border: '1px solid rgba(79,195,247,0.3)', borderRadius: '6px', padding: '12px', marginBottom: '12px' }}>
                                             <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#1565c0', fontWeight: 'bold' }}>
@@ -1438,8 +1576,8 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                 <strong>{TREATMENT_SUGGESTIONS[risk.id].option}:</strong> {TREATMENT_SUGGESTIONS[risk.id].note}
                                             </p>
 
-                                            {/* Echtes Mitigations-Ergebnis anzeigen wenn fertig */}
-                                            {simDone[risk.id] && mitigatedResult && (
+                                            {/*Echtes Mitigations-Ergebnis für Risiko 10*/}
+                                            {risk.id === 10 && simDone[risk.id] && mitigatedResult && (
                                                 <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
                                                     <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
                                                         Re-ran the test with gender removed from the prompt (Fairness through Unawareness, IEEE Std 3198-2025 Cl. 6.2.1.9)
@@ -1449,6 +1587,42 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                         {modelCheckResult && mitigatedResult.counterfactual_fairness < modelCheckResult.counterfactual_fairness
                                                             ? ' (improved)'
                                                             : ' (no improvement in this run)'}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/*Extended Validation Ergebnis für Risiko 8*/}
+                                            {risk.id === 8 && simDone[risk.id] && extendedValidationResult && (
+                                                <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
+                                                    <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
+                                                        Ran {extendedValidationResult.runs} independent test passes instead of one (cf. Aji &amp; Dhini, 2019, on cross-validation)
+                                                    </p>
+                                                    <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#2e7d32' }}>
+                                                        Individual accuracy results: {extendedValidationResult.individual_accuracies.map(a => `${Math.round(a * 100)}%`).join(', ')}
+                                                    </p>
+                                                    <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
+                                                        Average: <strong>{Math.round(extendedValidationResult.average_accuracy * 100)}%</strong>, range: {Math.round(extendedValidationResult.accuracy_range[0] * 100)}%–{Math.round(extendedValidationResult.accuracy_range[1] * 100)}%
+                                                        {(extendedValidationResult.accuracy_range[1] - extendedValidationResult.accuracy_range[0]) > 0.15
+                                                            ? ' - notable run-to-run variability, indicating the model\'s performance is not yet reliably validated.'
+                                                            : ' - results were consistent across runs.'}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/*Aggregated Occlusion Ergebnis für Risiko 2*/}
+                                            {risk.id === 2 && simDone[risk.id] && occlusionAggregatedResult && (
+                                                <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
+                                                    <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
+                                                        Ran Occlusion across {occlusionAggregatedResult.total_applicants_tested} applicants instead of one
+                                                    </p>
+                                                    <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#2e7d32' }}>
+                                                        Most consistently influential: <strong>{occlusionAggregatedResult.field_influence_summary[0]?.field}</strong>{' '}
+                                                        ({Math.round(occlusionAggregatedResult.field_influence_summary[0]?.influential_rate * 100)}% of applicants)
+                                                    </p>
+                                                    <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
+                                                        {occlusionAggregatedResult.field_influence_summary[0]?.influential_rate >= 0.6
+                                                            ? 'A consistent pattern was found across applicants, improving the reliability of this explanation.'
+                                                            : 'No single feature was consistently influential - the model\'s decision basis remains difficult to explain reliably.'}
                                                     </p>
                                                 </div>
                                             )}
@@ -1475,7 +1649,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                             }}
                                                         >
                                                             {simulating === risk.id
-                                                                ? 'Re-running test... (~30-60s)'
+                                                                ? (risk.id === 10 ? 'Re-running test... (~30-60s)' : 'Running... (~3-5 min)')
                                                                 : simDone[risk.id]
                                                                     ? 'Completed'
                                                                     : `${TREATMENT_SUGGESTIONS[risk.id].simulationButton}`}
@@ -1499,7 +1673,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                         </div>
                                     )}
 
-                                    {/* Fall A: Vorschlag wurde bereits übernommen -> nur Zusammenfassung + Edit-Link, kein offenes Formular */}
+                                    {/*Fall A: Vorschlag wurde bereits übernommen --> nur Zusammenfassung + Edit-Link, kein offenes Formular*/}
                                     {TREATMENT_SUGGESTIONS[risk.id] && risk.treatmentOption && !manualOverride[risk.id] && !editingApplied[risk.id] && (
                                         <div style={{ background: 'white', border: '1px solid #ddd', borderRadius: '6px', padding: '12px' }}>
                                             <p style={{ margin: '0 0 4px', fontSize: '13px' }}>
@@ -1518,7 +1692,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                         </div>
                                     )}
 
-                                    {/* Fall B: kein Vorschlag vorhanden, oder User bearbeitet/definiert manuell */}
+                                    {/*Fall B: kein Vorschlag vorhanden, oder User bearbeitet manuell*/}
                                     {(!TREATMENT_SUGGESTIONS[risk.id] || manualOverride[risk.id] || editingApplied[risk.id]) && (
                                         <>
                                             <label style={styles.label}>Treatment Option (ISO 31000 Cl. 6.5.2)</label>
@@ -1561,7 +1735,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                     )}
                                 </div>
 
-                                {/* Phase 2 - Residual Risk einschätzen */}
+                                {/*Phase 2 - Residual Risk einschätzen*/}
                                 {risk.treatmentStatus === 'suggested' && (
                                     <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px', marginBottom: '14px' }}>
                                         <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 'bold', color: '#1a1a2e' }}>Phase 2 - Assess Residual Risk</p>
@@ -1610,7 +1784,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                             </div>
                                         </div>
 
-                                        {/* Warnung wenn noch High/Very High */}
+                                        {/*Warnung wenn noch High/Very High*/}
                                         {(risk.residualLevel === 'High' || risk.residualLevel === 'Very High') && (
                                             <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
                                                 <p style={{ margin: 0, fontSize: '13px', color: '#c62828', fontWeight: 'bold' }}>
@@ -1621,7 +1795,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                     </div>
                                 )}
 
-                                {/* Confirm Button */}
+                                {/*Confirm Button*/}
                                 {risk.treatmentStatus === 'suggested' && (
                                     <button onClick={() => confirmTreatment(risk.id)}
                                         disabled={risk.residualLevel === 'High' || risk.residualLevel === 'Very High'}
@@ -1638,7 +1812,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                             </>
                         )}
 
-                        {/* Bestätigt - Zusammenfassung */}
+                        {/*Bestätigt - Zusammenfassung*/}
                         {risk.treatmentStatus === 'confirmed' && (
                             <div style={{ borderTop: '1px solid #c8e6c9', paddingTop: '12px' }}>
                                 <p style={{ margin: '0 0 4px', fontSize: '13px' }}><strong>Treatment:</strong> {risk.treatmentOption}</p>
@@ -1679,17 +1853,18 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
     const [downloading, setDownloading] = useState(false)
     const [downloaded, setDownloaded] = useState(false)
 
+    //Downloading
     async function handleDownload() {
         setDownloading(true)
         await new Promise(resolve => setTimeout(resolve, 2000))
 
-        const doc = new jsPDF()
+        const doc = new jsPDF()     //neues PDF Dokument
         let y = 20
 
         //Titel
         doc.setFontSize(18)
         doc.setFont('helvetica', 'bold')
-        doc.text('AI Risk Assessment Report', 105, y, { align: 'center' })
+        doc.text('Risk Management System - Report', 105, y, { align: 'center' })
         y += 8
 
         doc.setFontSize(10)
@@ -1781,12 +1956,13 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
         setDownloaded(true)
     }
 
+    //Assessment abschließen
     async function finish() {
         try {
             await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'completed' }),
+                body: JSON.stringify({ status: 'completed', risks: risks }),
             })
             onFinish()
         } catch (error) {
@@ -1863,7 +2039,7 @@ const styles = {
 
 //Gesamte App
 export default function App() {
-    const [screen, setScreen] = useState('landing') // landing | form | steps
+    const [screen, setScreen] = useState('landing') //Steuerung der Anzeige
     const [currentStep, setCurrentStep] = useState(1)
     const [user, setUser] = useState({ assessorName: '', role: '', aiSystemName: '', date: '' })
     const [scope, setScope] = useState({ domain: '', phase: '' })
@@ -1887,8 +2063,10 @@ export default function App() {
     const [occlusionError, setOcclusionError] = useState(null)
 
     const [mitigatedResult, setMitigatedResult] = useState(null)
+    const [extendedValidationResult, setExtendedValidationResult] = useState(null)
+    const [occlusionAggregatedResult, setOcclusionAggregatedResult] = useState(null)
 
-
+    //AI Test
     async function runModelCheck() {
         setModelCheckLoading(true)
         setModelCheckError(null)
@@ -1899,11 +2077,12 @@ export default function App() {
             setModelCheckResult(data)
         } catch (error) {
             console.error('Model check failed:', error)
-            setModelCheckError('Could not reach the AI model. Is the backend and Ollama running?')
+            setModelCheckError('Could not reach the AI model.')
         }
         setModelCheckLoading(false)
     }
 
+    //AI Test
     async function runOcclusionTest() {
         setOcclusionLoading(true)
         setOcclusionError(null)
@@ -1915,7 +2094,7 @@ export default function App() {
             setOcclusionResult(data)
         } catch (error) {
             console.error('Occlusion test failed:', error)
-            setOcclusionError('Could not reach the AI model. Is the backend and Ollama running?')
+            setOcclusionError('Could not reach the AI model.')
         }
         setOcclusionLoading(false)
     }
@@ -1946,7 +2125,7 @@ export default function App() {
             setCurrentStep(1)
         } catch (error) {
             console.error('Failed to create assessment:', error)
-            alert('Could not connect to the backend. Is the server running?')
+            alert('Could not connect to the backend.')
         }
     }
 
@@ -1981,7 +2160,7 @@ export default function App() {
                 occlusionLoading={occlusionLoading} occlusionResult={occlusionResult} occlusionError={occlusionError} runOcclusionTest={runOcclusionTest}
             />
             case 3: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} />
-            case 4: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} mitigatedResult={mitigatedResult} setMitigatedResult={setMitigatedResult} />
+            case 4: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} mitigatedResult={mitigatedResult} setMitigatedResult={setMitigatedResult} extendedValidationResult={extendedValidationResult} setExtendedValidationResult={setExtendedValidationResult} occlusionAggregatedResult={occlusionAggregatedResult} setOcclusionAggregatedResult={setOcclusionAggregatedResult} />
             case 5: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} onFinish={() => setScreen('landing')} />
             default: return null
         }
@@ -2002,6 +2181,8 @@ export default function App() {
         setOcclusionResult(null)
         setOcclusionError(null)
         setMitigatedResult(null)
+        setExtendedValidationResult(null)
+        setOcclusionAggregatedResult(null)
         setCurrentStep(1)
         setScreen('form')
     }
@@ -2051,6 +2232,8 @@ export default function App() {
                     modelCheckResult={modelCheckResult}
                     occlusionResult={occlusionResult}
                     mitigatedResult={mitigatedResult}
+                    extendedValidationResult={extendedValidationResult}
+                    occlusionAggregatedResult={occlusionAggregatedResult}
                     onClose={() => setModelCheckPanelOpen(false)}
                 />
             )}
