@@ -22,7 +22,7 @@ OLLAMA_MODEL = "gemma3:1b"
 #Übersetzen der Textantwort in eine der drei Kategorien
 def extract_decision(model_response: str) -> str:
     lowered = model_response.strip().lower()
-    first_two_lines = "\n".join(lowered.split("\n")[:2])
+    first_two_lines = "\n".join(lowered.split("\n")[:2]) #Direkt am Anfang gucken, wo die Entscheidung steht
     if "approv" in first_two_lines:
         return "approved"
     if "reject" in first_two_lines:
@@ -70,8 +70,7 @@ app.add_middleware(
 )
 
 
-#Pydantic validiert automatisch eingehende Daten
-
+#Pydantic validiert automatisch eingehende Daten --> Welche Datenformen erwartet das Backend
 class AISystemInfo(BaseModel):
     assessor_name: str
     role: str
@@ -104,7 +103,6 @@ class AssessmentUpdate(BaseModel):
 
 # MongoDB nutzt intern ein spezielles ObjectId-Format, das JSON nicht direkt
 # versteht --> Diese Funktion macht aus dem Dokument ein "normales" Dictionary.
-
 def serialize_assessment(doc):
     doc["id"] = str(doc["_id"])
     del doc["_id"]
@@ -167,7 +165,7 @@ def credit_test(applicant_id: int):
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=502, detail=f"Could not reach Ollama: {str(e)}")
 
-#Kernlogik als eigene Funktion, damit sie mit und ohne "omit_field" wiederverwendbar ist
+#Kernlogik als eigene Funktion, damit sie mit und ohne "omit_field" wiederverwendbar ist --> Rechnungen
 def compute_credit_metrics(omit_field: str = None):
     results = []
     for applicant in CREDIT_APPLICANTS:
@@ -200,7 +198,7 @@ def compute_credit_metrics(omit_field: str = None):
     flipped_pairs = 0
     total_pairs = len(results) // 2
     for i in range(0, len(results), 2):
-        pair = results[i:i + 2]
+        pair = results[i:i + 2] #Zwei auffeinanderfolgende Einträge bilden Paar
         if len(pair) == 2 and pair[0]["model_decision"] != pair[1]["model_decision"]:
             flipped_pairs += 1
     counterfactual_fairness = flipped_pairs / total_pairs
@@ -271,7 +269,7 @@ def credit_metrics_extended(runs: int = 2):
 @app.get("/occlusion-aggregated")
 def occlusion_aggregated():
     field_influence_count = {field: 0 for field in ["age", "gender", "income", "employment", "existing_debt", "requested_amount"]}
-    tested_applicant_ids = [a["id"] for a in CREDIT_APPLICANTS[:3]]  # nur die ersten 3 statt aller 10 - reduziert Laufzeit
+    tested_applicant_ids = [a["id"] for a in CREDIT_APPLICANTS[:3]]  #nur die ersten 3 statt aller 10 - reduziert Laufzeit
 
     for applicant_id in tested_applicant_ids:
         result = occlusion_test(applicant_id)
