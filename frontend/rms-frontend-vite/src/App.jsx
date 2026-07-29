@@ -543,7 +543,7 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
         const level = scoreToNistLevel((1 - modelCheckResult.accuracy) * 100)
         return {
             level,
-            reason: `The AI got ${Math.round(modelCheckResult.accuracy * 100)}% of test decisions right. A low result from a single test run is exactly the kind of undetected problem this risk is about.`,
+            reason: `The AI got ${Math.round(modelCheckResult.accuracy * 100)}% of test decisions right. Since this is based on just one test run, it is unclear whether this reflects the model's real performance or an unlucky sample.`,
         }
     }
     if (riskId === 2 && occlusionResult) {
