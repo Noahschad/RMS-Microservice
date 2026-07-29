@@ -723,7 +723,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult,
                         <p style={{ fontSize: '13px', color: '#5a5a5a' }}>
                             {(extendedValidationResult.accuracy_range[1] - extendedValidationResult.accuracy_range[0]) > 0.15
                                 ? 'The results changed quite a bit between tests - a single test alone would not be reliable enough.'
-                                : 'The results stayed fairly similar every time we tested.'}
+                                : 'The results stayed fairly similar every time.'}
                         </p>
                     </div>
                 )}
@@ -732,7 +732,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult,
                     <div>
                         <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Checking multiple example applicants</h3>
                         <p style={{ fontSize: '13px', marginBottom: '10px' }}>
-                            We checked {occlusionAggregatedResult.total_applicants_tested} example applicants.
+                            Checked {occlusionAggregatedResult.total_applicants_tested} example applicants.
                         </p>
                         <table style={styles.table}>
                             <thead>
@@ -1375,15 +1375,15 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                 setExtendedValidationResult(data)
 
                 //Je größer die Schwankung (Range), desto höher das Restrisiko
-                const spread = data.accuracy_range[1] - data.accuracy_range[0]
-                const newLevel = spread > 0.15 ? 'Moderate' : 'Low'
+                const errorRate = (1 - data.average_accuracy) * 100
+                const newLikelihood = scoreToNistLevel(errorRate)
                 setRisks(risks.map(r => r.id !== id ? r : {
                     ...r,
                     treatmentOption: suggestion.option,
                     treatmentNote: suggestion.note,
-                    residualLikelihood: newLevel,
-                    residualImpact: newLevel,
-                    residualLevel: getRiskLevel(newLevel, newLevel),
+                    residualLikelihood: newLikelihood,
+                    residualImpact: r.impact,
+                    residualLevel: getRiskLevel(newLikelihood, r.impact),
                     treatmentStatus: 'suggested',
                 }))
             } else if (id === 2) {
@@ -1394,14 +1394,14 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
 
                 //Wenn ein Merkmal konsistent (>=60%) einflussreich ist, gilt das Muster als stabiler -> geringeres Risiko
                 const topRate = data.field_influence_summary[0]?.influential_rate || 0
-                const newLevel = topRate >= 0.6 ? 'Low' : 'Moderate'
+                const newLikelihood = topRate >= 0.6 ? 'Low' : 'Moderate'
                 setRisks(risks.map(r => r.id !== id ? r : {
                     ...r,
                     treatmentOption: suggestion.option,
                     treatmentNote: suggestion.note,
-                    residualLikelihood: newLevel,
-                    residualImpact: newLevel,
-                    residualLevel: getRiskLevel(newLevel, newLevel),
+                    residualLikelihood: newLikelihood,
+                    residualImpact: r.impact,
+                    residualLevel: getRiskLevel(newLikelihood, r.impact),
                     treatmentStatus: 'suggested',
                 }))
             }
