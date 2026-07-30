@@ -543,7 +543,7 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
         const level = scoreToNistLevel((1 - modelCheckResult.accuracy) * 100)
         return {
             level,
-            reason: `The AI got ${Math.round(modelCheckResult.accuracy * 100)}% of test decisions right. Since this is based on just one test run, it is unclear whether this reflects the model's real performance or an unlucky sample.`,
+            reason: `The AI got ${Math.round(modelCheckResult.accuracy * 100)}% of test decisions right. Since this is based on just one test run, it is unclear whether this reflects the model's real performance.`,
         }
     }
     if (riskId === 2 && occlusionResult) {
@@ -1374,9 +1374,12 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                 const data = await response.json()
                 setExtendedValidationResult(data)
 
-                //Je größer die Schwankung (Range), desto höher das Restrisiko
-                const errorRate = (1 - data.average_accuracy) * 100
-                const newLikelihood = scoreToNistLevel(errorRate)
+                //Schwankung über alle bisherigen Testläufe (erster Test + die neuen): je größer, desto unzuverlässiger, desto höher das Risiko
+                const allAccuracies = modelCheckResult
+                    ? [modelCheckResult.accuracy, ...data.individual_accuracies]
+                    : data.individual_accuracies
+                const spread = (Math.max(...allAccuracies) - Math.min(...allAccuracies)) * 100
+                const newLikelihood = scoreToNistLevel(spread)
                 setRisks(risks.map(r => r.id !== id ? r : {
                     ...r,
                     treatmentOption: suggestion.option,
@@ -1602,22 +1605,32 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                             )}
 
                                             {/*Extended Validation Ergebnis für Risiko 8*/}
-                                            {risk.id === 8 && simDone[risk.id] && extendedValidationResult && (
-                                                <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
-                                                    <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
-                                                        Tested the AI {extendedValidationResult.runs} times instead of once
-                                                    </p>
-                                                    <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#2e7d32' }}>
-                                                        Results per test: {extendedValidationResult.individual_accuracies.map(a => `${Math.round(a * 100)}%`).join(', ')} correct
-                                                    </p>
-                                                    <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
-                                                        On average: <strong>{Math.round(extendedValidationResult.average_accuracy * 100)}%</strong> correct.
-                                                        {(extendedValidationResult.accuracy_range[1] - extendedValidationResult.accuracy_range[0]) > 0.15
-                                                            ? ' The results changed a lot between tests, so a single test alone would not be reliable enough.'
-                                                            : ' The results stayed fairly similar each time.'}
-                                                    </p>
-                                                </div>
-                                            )}
+                                            {risk.id === 8 && simDone[risk.id] && extendedValidationResult && (() => {
+                                                const allAcc = modelCheckResult
+                                                    ? [modelCheckResult.accuracy, ...extendedValidationResult.individual_accuracies]
+                                                    : extendedValidationResult.individual_accuracies
+                                                const fullSpread = Math.max(...allAcc) - Math.min(...allAcc)
+                                                return (
+                                                    <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
+                                                        <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
+                                                            Tested the AI {extendedValidationResult.runs} times instead of once
+                                                        </p>
+                                                        <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#2e7d32' }}>
+                                                            Results per test: {extendedValidationResult.individual_accuracies.map(a => `${Math.round(a * 100)}%`).join(', ')} correct
+                                                            {modelCheckResult && ` (first test: ${Math.round(modelCheckResult.accuracy * 100)}%)`}
+                                                        </p>
+                                                        <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
+                                                            On average across the two new tests: <strong>{Math.round(extendedValidationResult.average_accuracy * 100)}%</strong> correct.
+                                                            {fullSpread > 0.15
+                                                                ? ' Across all tests including the first one, the results varied a lot, so a single test alone would not be reliable enough.'
+                                                                : ' The results stayed fairly similar across all tests, including the first one.'}
+                                                        </p>
+                                                        <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#5a5a5a', fontStyle: 'italic' }}>
+                                                            This spread of {Math.round(fullSpread * 100)} percentage points across all test runs (including the first test) is used to suggest the residual Likelihood below: a small spread suggests a stable, verifiable result; a large spread means the outcome is still uncertain.
+                                                        </p>
+                                                    </div>
+                                                )
+                                            })()}
 
                                             {/*Aggregated Occlusion Ergebnis für Risiko 2*/}
                                             {risk.id === 2 && simDone[risk.id] && occlusionAggregatedResult && (
