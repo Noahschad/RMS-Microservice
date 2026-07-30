@@ -1501,7 +1501,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
     return (
         <div style={styles.page}>
             <h1 style={styles.heading}>Risk Treatment</h1>
-            <p style={styles.sub}>Define and confirm mitigation measures - ISO 31000 Cl. 6.5</p>
+            <p style={styles.sub}>Define and confirm treatment measures - ISO 31000 Cl. 6.5</p>
 
             {(modelCheckResult || occlusionResult) && (
                 <button
@@ -1625,10 +1625,18 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                     <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
                                                         Ran Occlusion across {occlusionAggregatedResult.total_applicants_tested} applicants instead of one
                                                     </p>
-                                                    <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#2e7d32' }}>
-                                                        Most consistently influential: <strong>{occlusionAggregatedResult.field_influence_summary[0]?.field}</strong>{' '}
-                                                        ({Math.round(occlusionAggregatedResult.field_influence_summary[0]?.influential_rate * 100)}% of applicants)
-                                                    </p>
+                                                    {(() => {
+                                                        const maxRate = occlusionAggregatedResult.field_influence_summary[0]?.influential_rate || 0
+                                                        const topFields = occlusionAggregatedResult.field_influence_summary
+                                                            .filter(f => f.influential_rate === maxRate)
+                                                            .map(f => f.field)
+                                                        return (
+                                                            <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#2e7d32' }}>
+                                                                Most consistently influential: <strong>{topFields.join(', ')}</strong>{' '}
+                                                                ({Math.round(maxRate * 100)}% of applicants)
+                                                            </p>
+                                                        )
+                                                    })()}
                                                     <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
                                                         {occlusionAggregatedResult.field_influence_summary[0]?.influential_rate >= 0.6
                                                             ? 'A consistent pattern was found across applicants, improving the reliability of this explanation.'
@@ -1750,7 +1758,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                     <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px', marginBottom: '14px' }}>
                                         <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 'bold', color: '#1a1a2e' }}>Phase 2 - Assess Residual Risk</p>
                                         <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#666' }}>
-                                            After applying this measure, how do you assess the remaining risk? (ISO 31000 Cl. 6.5.1)
+                                            After applying this measure, how do you assess the remaining risk?
                                         </p>
                                         {mitigatedResult && simDone[risk.id] && (
                                             <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#8d6e00', fontStyle: 'italic' }}>
@@ -1930,7 +1938,10 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
             doc.setFont('helvetica', 'normal')
             doc.text(`   Risk Level: ${r.level} | Likelihood: ${r.likelihood} | Impact: ${r.impact}`, 20, y); y += 5
             if (r.treatmentOption) {
-                doc.text(`   Treatment: ${r.treatmentOption} - ${r.treatmentNote}`, 20, y, { maxWidth: 165 }); y += 8
+                const treatmentText = `   Treatment: ${r.treatmentOption} - ${r.treatmentNote}`
+                const lines = doc.splitTextToSize(treatmentText, 165)
+                doc.text(lines, 20, y)
+                y += lines.length * 5 + 3
                 doc.text(`   Residual Risk: ${r.residualLevel}`, 20, y); y += 8
             } else {
                 y += 4
@@ -1953,7 +1964,9 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
                 doc.setFont('helvetica', 'normal')
                 doc.text(`   Risk Level: ${m.level} | Likelihood: ${m.likelihood} | Impact: ${m.impact}`, 20, y); y += 5
                 if (m.description) {
-                    doc.text(`   ${m.description}`, 20, y, { maxWidth: 165 }); y += 8
+                    const descLines = doc.splitTextToSize(`   ${m.description}`, 165)
+                    doc.text(descLines, 20, y)
+                    y += descLines.length * 5 + 3
                 } else {
                     y += 4
                 }
