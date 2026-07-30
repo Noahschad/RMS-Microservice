@@ -1,3 +1,4 @@
+#Nur Gender ändert sich, um die Fairness darzustellen
 CREDIT_APPLICANTS = [
     {"id": 1, "age": 35, "income": 45000, "employment": "permanent", "existing_debt": 5000, "requested_amount": 20000, "gender": "female", "ground_truth": "approved"},
     {"id": 2, "age": 35, "income": 45000, "employment": "permanent", "existing_debt": 5000, "requested_amount": 20000, "gender": "male", "ground_truth": "approved"},
