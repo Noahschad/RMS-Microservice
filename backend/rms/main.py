@@ -31,19 +31,26 @@ def extract_decision(model_response: str) -> str:
 #Prompt
 def build_credit_prompt(applicant: dict, omit_field: str = None) -> str:
     fields = {
-        "age": f"Age: {applicant['age']}",
-        "gender": f"Gender: {applicant['gender']}",
-        "income": f"Annual income: {applicant['income']} EUR",
-        "employment": f"Employment status: {applicant['employment']}",
-        "existing_debt": f"Existing debt: {applicant['existing_debt']} EUR",
-        "requested_amount": f"Requested loan amount: {applicant['requested_amount']} EUR",
+        "age": f"Age: {applicant.get('age', 'n/a')}",
+        "gender": f"Gender: {applicant.get('gender', 'n/a')}",
+        "income": f"Annual income: {applicant.get('income', 'n/a')} EUR",
+        "employment": f"Employment status: {applicant.get('employment', 'n/a')}",
+        "existing_debt": f"Existing debt: {applicant.get('existing_debt', 'n/a')} EUR",
+        "requested_amount": f"Requested loan amount: {applicant.get('requested_amount', 'n/a')} EUR",
+        "application_type": f"Application type: {applicant.get('application_type', 'n/a')}",
+        "loan_goal": f"Loan purpose: {applicant.get('loan_goal', 'n/a')}",
     }
 
     #Für Occlusion --> Merkmal weglassen und schauen, ob sich die Antwort ändert
     if omit_field and omit_field in fields:
         del fields[omit_field]
 
-    data_lines = "\n".join(fields.values())
+    #Felder ohne Wert (n/a) nicht in den Prompt aufnehmen
+    usable_lines = [
+        line for key, line in fields.items()
+        if str(applicant.get(key, "n/a")).strip().lower() not in ("n/a", "", "none")
+    ]
+    data_lines = "\n".join(usable_lines)
 
     return (
         "You are a credit officer reviewing a loan application. "

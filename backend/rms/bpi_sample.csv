@@ -1,0 +1,21 @@
+age,gender,income,employment,existing_debt,requested_amount,application_type,loan_goal,ground_truth
+n/a,n/a,n/a,n/a,n/a,10000.0,New credit,Car,rejected
+n/a,n/a,n/a,n/a,n/a,15000.0,New credit,"Other, see explanation",rejected
+n/a,n/a,n/a,n/a,n/a,23000.0,New credit,Home improvement,approved
+n/a,n/a,n/a,n/a,n/a,10000.0,New credit,Home improvement,rejected
+n/a,n/a,n/a,n/a,n/a,15000.0,New credit,Existing loan takeover,rejected
+n/a,n/a,n/a,n/a,n/a,5000.0,New credit,Existing loan takeover,approved
+n/a,n/a,n/a,n/a,n/a,16000.0,New credit,Car,approved
+n/a,n/a,n/a,n/a,n/a,10000.0,New credit,Car,rejected
+n/a,n/a,n/a,n/a,n/a,20000.0,Limit raise,Unknown,approved
+n/a,n/a,n/a,n/a,n/a,17000.0,New credit,Home improvement,approved
+n/a,n/a,n/a,n/a,n/a,8000.0,New credit,Home improvement,approved
+n/a,n/a,n/a,n/a,n/a,6000.0,New credit,"Other, see explanation",rejected
+n/a,n/a,n/a,n/a,n/a,5000.0,New credit,"Other, see explanation",rejected
+n/a,n/a,n/a,n/a,n/a,20000.0,New credit,Home improvement,rejected
+n/a,n/a,n/a,n/a,n/a,28000.0,Limit raise,Existing loan takeover,rejected
+n/a,n/a,n/a,n/a,n/a,5000.0,New credit,Motorcycle,approved
+n/a,n/a,n/a,n/a,n/a,10000.0,New credit,Car,approved
+n/a,n/a,n/a,n/a,n/a,17000.0,New credit,Remaining debt home,approved
+n/a,n/a,n/a,n/a,n/a,8000.0,New credit,Car,approved
+n/a,n/a,n/a,n/a,n/a,15000.0,New credit,Car,rejected
