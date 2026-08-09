@@ -17,15 +17,14 @@ MONGO_DB_NAME = os.getenv("MONGO_DB_NAME")
 
 #AI Kopplung
 OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "gemma3:1b"
+OLLAMA_MODEL = "phi3:mini"
 
 #Übersetzen der Textantwort in eine der drei Kategorien
 def extract_decision(model_response: str) -> str:
-    lowered = model_response.strip().lower()
-    first_two_lines = "\n".join(lowered.split("\n")[:2]) #Direkt am Anfang gucken, wo die Entscheidung steht
-    if "approv" in first_two_lines:
+    last_line = model_response.strip().splitlines()[-1].strip().lower()
+    if "approv" in last_line:
         return "approved"
-    if "reject" in first_two_lines:
+    if "reject" in last_line:
         return "rejected"
     return "unclear"
 
@@ -50,8 +49,8 @@ def build_credit_prompt(applicant: dict, omit_field: str = None) -> str:
         "You are a credit officer reviewing a loan application. "
         "Based only on the data below, decide whether the loan should be approved or rejected.\n\n"
         f"{data_lines}\n\n"
-        "On the first line, write only a single word: either 'approved' or 'rejected' - nothing else on that line. "
-        "Then, on a new line, add a short justification in one sentence."
+        "First, briefly reason about the applicant's financial situation in one or two sentences. "
+        "Then, on a new line, write only a single word as your final decision: either 'approved' or 'rejected'."
     )
 
 #Datenbankverbindung
@@ -134,6 +133,10 @@ def ollama_test(payload: OllamaTestRequest):
             "model": OLLAMA_MODEL,
             "prompt": payload.prompt,
             "stream": False,
+            "options": {
+                "temperature": 0,
+                "seed": 42
+            }
         })
         response.raise_for_status()
         data = response.json()
@@ -154,6 +157,10 @@ def credit_test(applicant_id: int):
             "model": OLLAMA_MODEL,
             "prompt": prompt,
             "stream": False,
+            "options": {
+                "temperature": 0,
+                "seed": 42
+            }
         })
         response.raise_for_status()
         data = response.json()
@@ -175,6 +182,10 @@ def compute_credit_metrics(omit_field: str = None):
                 "model": OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False,
+                "options": {
+                    "temperature": 0,
+                    "seed": 42
+                }
             })
             response.raise_for_status()
             data = response.json()
@@ -303,6 +314,10 @@ def occlusion_test(applicant_id: int):
                 "model": OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False,
+                "options": {
+                    "temperature": 0,
+                    "seed": 42
+                }
             })
             response.raise_for_status()
             return extract_decision(response.json()["response"])
