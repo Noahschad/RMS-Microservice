@@ -111,10 +111,11 @@ const TREATMENT_SUGGESTIONS = {
 //5 Prozessschritte
 const STEPS = [
     { id: 1, label: 'Scope & Criteria', sub: 'ISO 31000 Cl. 6.3' },
-    { id: 2, label: 'Risk Identification', sub: 'ISO/IEC 23894 Cl. 6.4.2' },
-    { id: 3, label: 'Risk Analysis', sub: 'ISO/IEC 23894 Cl. 6.4.3' },
-    { id: 4, label: 'Risk Treatment', sub: 'ISO 31000 Cl. 6.5' },
-    { id: 5, label: 'Report', sub: 'ISO 31000 Cl. 6.7' },
+    { id: 2, label: 'AI Model Check', sub: 'ISO/IEC 23894 Cl. 6.4.2' },
+    { id: 3, label: 'Risk Identification', sub: 'ISO/IEC 23894 Cl. 6.4.2' },
+    { id: 4, label: 'Risk Analysis', sub: 'ISO/IEC 23894 Cl. 6.4.3' },
+    { id: 5, label: 'Risk Treatment', sub: 'ISO 31000 Cl. 6.5' },
+    { id: 6, label: 'Report', sub: 'ISO 31000 Cl. 6.7' },
 ]
 
 //Hilfsfunktion für die Farbe
@@ -514,6 +515,20 @@ function interpretF1(f1) {
     return `This score combines Precision and Recall into one number (${pct}%), to give a quick overall impression.`
 }
 
+//Einfacher CSV-Parser für hochgeladene Antragsteller-Dateien (erwartet Komma-getrennt, erste Zeile = Header)
+function parseCSV(text) {
+    const lines = text.trim().split('\n')
+    const headers = lines[0].split(',').map(h => h.trim())
+    return lines.slice(1).map(line => {
+        //Einfaches Split reicht hier, da unsere CSVs keine Kommas innerhalb von Feldern enthalten (außer ggf. in Anführungszeichen)
+        const matches = line.match(/(".*?"|[^",]+)(?=,|$)/g) || []
+        const values = matches.map(v => v.replace(/^"|"$/g, '').trim())
+        const row = {}
+        headers.forEach((h, i) => { row[h] = values[i] ?? 'n/a' })
+        return row
+    })
+}
+
 //NIST SP 800-30, Table I-3 (semi-quantitative bins, 0-100 scale)
 const NIST_SEMI_QUANT_BINS = [
     { max: 4, level: 'Very Low' },
@@ -813,7 +828,7 @@ function UserForm({ onBegin, onBack }) {
 }
 
 //Scope & Criteria Seite
-function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impactScale, setImpactScale, assessmentId, previousPhase, onNext }) {
+function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impactScale, setImpactScale, assessmentId, previousPhase, onNext, onDomainChange }) {
     const [form, setForm] = useState(scope)
     const isValid = form.domain && form.phase
     const isReassessment = !!previousPhase
@@ -821,6 +836,9 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
 
     //Speicherfunktion --> PUT Anfrage ans Backend
     async function save() {
+        if (form.domain !== scope.domain && onDomainChange) {
+            onDomainChange()
+        }
         setScope(form)
         try {
             await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
@@ -919,10 +937,363 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
     )
 }
 
+//Ein aufklappbarer, nummerierter Abschnitt für den AI Model Check Flow
+function CheckSection({ number, title, done, isActive, onHeaderClick, children }) {
+    return (
+        <div style={{ ...styles.card, marginBottom: '16px', background: isActive ? '#f0f7ff' : '#fafafa', border: `1px solid ${isActive ? '#b3d9f7' : '#e0e0e0'}` }}>
+            <div
+                onClick={onHeaderClick}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: done ? 'pointer' : 'default' }}
+            >
+                <div style={{
+                    width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+                    background: done ? '#2e7d32' : (isActive ? '#1a1a2e' : '#ccc'),
+                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 'bold', fontSize: '14px',
+                }}>
+                    {done ? '✓' : number}
+                </div>
+                <h3 style={{ margin: 0, fontSize: '15px', color: isActive ? '#1a1a2e' : '#888' }}>{title}</h3>
+            </div>
+            {isActive && <div style={{ marginTop: '16px' }}>{children}</div>}
+        </div>
+    )
+}
+
+//Neuer eigener Schritt: AI Model Check (vorher Teil von Risk Identification)
+function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheckError, runModelCheck, occlusionApplicantId, setOcclusionApplicantId, occlusionLoading, occlusionResult, occlusionError, runOcclusionTest, onBack, onNext, dataSource, setDataSource, uploadedFile, onFileSelect, uploadedRows, selectedUploadRowIndex, setSelectedUploadRowIndex, customPrompt, setCustomPrompt, positiveLabel, setPositiveLabel, negativeLabel, setNegativeLabel }) {
+    const isFinance = scope.domain === 'Finance'
+    const FINANCE_PROMPT_SUGGESTION = "You are a credit officer reviewing a loan application. Based only on the data below, decide whether the loan should be approved or rejected."
+
+    const hasUploadedData = dataSource === 'upload' && uploadedRows.length > 0
+    const promptReady = customPrompt.trim() && positiveLabel.trim() && negativeLabel.trim()
+    const readyForChecks = dataSource === 'builtin' || (hasUploadedData && promptReady)
+
+    const [activeSection, setActiveSection] = useState(1)
+    const section1Done = dataSource === 'builtin' || hasUploadedData
+    const section2Done = dataSource === 'builtin' || promptReady
+
+    return (
+        <div style={styles.page}>
+            <h1 style={styles.heading}>AI Model Check</h1>
+            <p style={styles.sub}>Run technical checks on the connected AI system before identifying risks - ISO/IEC 23894 Cl. 6.4.2</p>
+
+            {/* Abschnitt 1: Choose Your Data */}
+            <CheckSection
+                number={1}
+                title="Choose Your Data"
+                done={section1Done}
+                isActive={activeSection === 1}
+                onHeaderClick={() => section1Done && setActiveSection(1)}
+            >
+                <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '14px' }}>
+                    Select which applicant data the checks below should use.
+                </p>
+
+                {!isFinance && (
+                    <div style={{ background: '#e3f2fd', border: '1px solid #90caf9', borderRadius: '6px', padding: '10px 14px', marginBottom: '14px' }}>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#1565c0' }}>
+                            The built-in test data is a credit scoring example and only applies to the "Finance" domain.
+                            Since you selected "<strong>{scope.domain || 'no domain'}</strong>", please upload your own data below.
+                        </p>
+                    </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px', marginBottom: dataSource === 'upload' ? '16px' : 0 }}>
+                    <button
+                        onClick={() => isFinance && setDataSource('builtin')}
+                        disabled={!isFinance}
+                        style={{
+                            ...styles.buttonOutline, marginTop: 0,
+                            background: dataSource === 'builtin' ? '#1a1a2e' : 'white',
+                            color: dataSource === 'builtin' ? 'white' : (isFinance ? '#1a1a2e' : '#bbb'),
+                            borderColor: dataSource === 'builtin' ? '#1a1a2e' : '#ddd',
+                            cursor: isFinance ? 'pointer' : 'not-allowed',
+                            opacity: isFinance ? 1 : 0.6,
+                        }}
+                    >
+                        Use built-in test data (10 sample applicants) {!isFinance && '- Finance only'}
+                    </button>
+                    <button
+                        onClick={() => setDataSource('upload')}
+                        style={{
+                            ...styles.buttonOutline, marginTop: 0,
+                            background: dataSource === 'upload' ? '#1a1a2e' : 'white',
+                            color: dataSource === 'upload' ? 'white' : '#1a1a2e',
+                            borderColor: dataSource === 'upload' ? '#1a1a2e' : '#ddd',
+                        }}
+                    >
+                        Upload my own CSV file
+                    </button>
+                </div>
+
+                {dataSource === 'upload' && (
+                    <div style={{ background: 'white', border: '1px solid #f0e0b0', borderRadius: '8px', padding: '14px' }}>
+                        <input
+                            type="file"
+                            accept=".csv"
+                            onChange={e => onFileSelect(e.target.files[0] || null)}
+                            style={{ fontSize: '13px', marginBottom: '10px', display: 'block' }}
+                        />
+                        <p style={{ fontSize: '12px', color: '#666', margin: '4px 0 0', lineHeight: 1.6 }}>
+                            {isFinance ? (
+                                <>Your CSV can use the standard columns (age, gender, income, employment, existing_debt, requested_amount, application_type, loan_goal), or any custom columns you like - as long as it has a <strong>ground_truth</strong> column.</>
+                            ) : (
+                                <>Your CSV file can use any column names you like (e.g. "years_of_experience", "test_score"), as long as it has a <strong>ground_truth</strong> column with the correct answer for each row.</>
+                            )}
+                        </p>
+                        {hasUploadedData && (
+                            <p style={{ fontSize: '13px', color: '#2e7d32', margin: '12px 0 0', fontWeight: 'bold' }}>
+                                ✓ File loaded: {uploadedRows.length} applicant{uploadedRows.length !== 1 ? 's' : ''} found.
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {!dataSource && (
+                    <p style={{ fontSize: '13px', color: '#e65100', marginTop: '12px', fontWeight: 'bold' }}>
+                        Please choose a data source above to continue.
+                    </p>
+                )}
+
+                {section1Done && (
+                    <button onClick={() => setActiveSection(2)} style={{ ...styles.button, marginTop: '16px' }}>
+                        Confirm & Continue →
+                    </button>
+                )}
+            </CheckSection>
+
+            {/* Abschnitt 2: Describe the Task */}
+            <CheckSection
+                number={2}
+                title="Describe the Task"
+                done={section2Done}
+                isActive={activeSection === 2}
+                onHeaderClick={() => section1Done && setActiveSection(2)}
+            >
+                {dataSource === 'builtin' ? (
+                    <p style={{ fontSize: '13px', color: '#666' }}>
+                        Not needed for built-in data - the task is already fixed to credit scoring.
+                    </p>
+                ) : (
+                    <>
+                        {isFinance && (
+                            <button
+                                onClick={() => {
+                                    setCustomPrompt(FINANCE_PROMPT_SUGGESTION)
+                                    setPositiveLabel('approved')
+                                    setNegativeLabel('rejected')
+                                }}
+                                style={{ ...styles.buttonOutline, marginTop: 0, marginBottom: '12px', fontSize: '12px' }}
+                            >
+                                Use suggested Finance prompt
+                            </button>
+                        )}
+
+                        <label style={styles.label}>Describe the task for the AI</label>
+                        <FieldHint text="Describe what the AI should decide, in plain language. Do not include the data itself - it will be added automatically below your description." />
+                        <textarea
+                            style={{ ...styles.input, height: '80px', resize: 'vertical', marginBottom: '12px' }}
+                            placeholder='e.g. "You are an HR recruiter reviewing a job candidate for a software engineering position. Based only on the data below, decide whether the candidate should be shortlisted or rejected."'
+                            value={customPrompt}
+                            onChange={e => setCustomPrompt(e.target.value)}
+                        />
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ flex: 1 }}>
+                                <label style={styles.label}>Positive outcome label</label>
+                                <FieldHint text='The exact word used for a positive decision in your ground_truth column, e.g. "approved" or "shortlisted".' />
+                                <input style={styles.input} placeholder="e.g. approved" value={positiveLabel} onChange={e => setPositiveLabel(e.target.value)} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <label style={styles.label}>Negative outcome label</label>
+                                <FieldHint text='The exact word used for a negative decision in your ground_truth column, e.g. "rejected".' />
+                                <input style={styles.input} placeholder="e.g. rejected" value={negativeLabel} onChange={e => setNegativeLabel(e.target.value)} />
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {section2Done && (
+                    <button onClick={() => setActiveSection(3)} style={{ ...styles.button, marginTop: '16px' }}>
+                        Confirm & Continue →
+                    </button>
+                )}
+            </CheckSection>
+
+            {/* Abschnitt 3: Run Checks */}
+            <CheckSection
+                number={3}
+                title="Run Checks"
+                done={!!modelCheckResult}
+                isActive={activeSection === 3}
+                onHeaderClick={() => section2Done && setActiveSection(3)}
+            >
+                <div style={{ background: 'white', border: '1px solid #d6e8f5', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+                    <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>Technical Check</h4>
+                    <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
+                        Runs the connected AI system (Phi-3-mini via Ollama) against the selected applicant data
+                        to measure Accuracy, Counterfactual Fairness, Precision, Recall, Specificity, and F1-Score.
+                    </p>
+                    <button
+                        onClick={runModelCheck}
+                        disabled={modelCheckLoading || !readyForChecks}
+                        style={{ ...styles.button, marginTop: 0, opacity: (modelCheckLoading || !readyForChecks) ? 0.6 : 1, cursor: (modelCheckLoading || !readyForChecks) ? 'not-allowed' : 'pointer' }}
+                    >
+                        {modelCheckLoading ? 'Running Test...' : 'Run AI Model Check'}
+                    </button>
+
+                    {modelCheckError && (
+                        <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#c62828' }}>{modelCheckError}</p>
+                        </div>
+                    )}
+
+                    {modelCheckResult && (
+                        <div style={{ marginTop: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                            <div style={{ flex: 1, minWidth: '180px', padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #eee' }}>
+                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Accuracy</div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e' }}>{Math.round(modelCheckResult.accuracy * 100)}%</div>
+                                <div style={{ fontSize: '11px', color: '#999', marginBottom: '8px' }}>over {modelCheckResult.sample_size} test applicants</div>
+                                <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>{interpretAccuracy(modelCheckResult.accuracy)}</p>
+                            </div>
+                            {modelCheckResult.counterfactual_fairness !== null && modelCheckResult.counterfactual_fairness !== undefined && (
+                                <div style={{ flex: 1, minWidth: '180px', padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #eee' }}>
+                                    <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Counterfactual Fairness</div>
+                                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: modelCheckResult.counterfactual_fairness > 0.1 ? '#c62828' : '#2e7d32' }}>
+                                        {modelCheckResult.counterfactual_fairness}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#999', marginBottom: '8px' }}>share of paired applicants whose decision flipped</div>
+                                    <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>{interpretFairness(modelCheckResult.counterfactual_fairness)}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {modelCheckResult && (
+                        <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                            {modelCheckResult.precision !== null && (
+                                <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #eee' }}>
+                                    <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Precision</div>
+                                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>{modelCheckResult.precision}</div>
+                                    <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>{interpretPrecision(modelCheckResult.precision)}</p>
+                                </div>
+                            )}
+                            {modelCheckResult.recall !== null && (
+                                <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #eee' }}>
+                                    <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Recall</div>
+                                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>{modelCheckResult.recall}</div>
+                                    <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>{interpretRecall(modelCheckResult.recall)}</p>
+                                </div>
+                            )}
+                            {modelCheckResult.specificity !== null && (
+                                <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #eee' }}>
+                                    <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Specificity</div>
+                                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>{modelCheckResult.specificity}</div>
+                                    <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>{interpretSpecificity(modelCheckResult.specificity)}</p>
+                                </div>
+                            )}
+                            {modelCheckResult.f1_score !== null && (
+                                <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #eee' }}>
+                                    <div style={{ fontSize: '12px', color: '#5a5a5a' }}>F1-Score</div>
+                                    <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>{modelCheckResult.f1_score}</div>
+                                    <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>{interpretF1(modelCheckResult.f1_score)}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {modelCheckResult && modelCheckResult.unclear_count > 0 && (
+                        <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px' }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
+                                {modelCheckResult.unclear_count} response(s) could not be clearly classified and were excluded from Precision/Recall/Specificity/F1.
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                <div style={{ background: 'white', border: '1px solid #d6e8f5', borderRadius: '8px', padding: '16px' }}>
+                    <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>Explainability Check (Occlusion)</h4>
+                    <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
+                        Removes one input field at a time from a single test applicant to see which features actually influence the model's decision.
+                    </p>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+                        <label style={{ ...styles.label, marginBottom: 0 }}>Test applicant:</label>
+                        {dataSource === 'upload' ? (
+                            uploadedRows.length > 0 ? (
+                                <select style={{ ...styles.input, width: '120px' }} value={selectedUploadRowIndex} onChange={e => setSelectedUploadRowIndex(Number(e.target.value))}>
+                                    {uploadedRows.map((row, idx) => (
+                                        <option key={idx} value={idx}>Row {idx + 1}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <span style={{ fontSize: '13px', color: '#e65100' }}>Upload a file above first.</span>
+                            )
+                        ) : (
+                            <select style={{ ...styles.input, width: '80px' }} value={occlusionApplicantId} onChange={e => setOcclusionApplicantId(Number(e.target.value))}>
+                                {Array.from({ length: 10 }, (_, i) => i + 1).map(id => <option key={id} value={id}>#{id}</option>)}
+                            </select>
+                        )}
+                        <button
+                            onClick={runOcclusionTest}
+                            disabled={occlusionLoading || !readyForChecks || (dataSource === 'upload' && uploadedRows.length === 0)}
+                            style={{ ...styles.button, marginTop: 0, opacity: (occlusionLoading || !readyForChecks) ? 0.6 : 1, cursor: (occlusionLoading || !readyForChecks) ? 'not-allowed' : 'pointer' }}
+                        >
+                            {occlusionLoading ? 'Running Test...' : 'Run Occlusion Test'}
+                        </button>
+                    </div>
+
+                    {occlusionError && (
+                        <div style={{ padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#c62828' }}>{occlusionError}</p>
+                        </div>
+                    )}
+
+                    {occlusionResult && (
+                        <div style={{ marginTop: '12px' }}>
+                            <p style={{ fontSize: '13px', marginBottom: '10px' }}>
+                                Baseline decision (all fields present): <strong>{occlusionResult.baseline_decision}</strong>
+                            </p>
+                            <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
+                                {(() => {
+                                    const influential = occlusionResult.occlusion_results.filter(r => r.changed_from_baseline).map(r => r.omitted_field)
+                                    return influential.length === 0
+                                        ? "No single field changed the decision when removed."
+                                        : `The decision changed when removing: ${influential.join(', ')}.`
+                                })()}
+                            </p>
+                            <table style={styles.table}>
+                                <thead>
+                                <tr>
+                                    <th style={styles.th}>Field removed</th>
+                                    <th style={styles.th}>Decision without it</th>
+                                    <th style={styles.th}>Changed the outcome?</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {occlusionResult.occlusion_results.map(r => (
+                                    <tr key={r.omitted_field}>
+                                        <td style={styles.td}>{r.omitted_field}</td>
+                                        <td style={styles.td}>{r.decision_without_field}</td>
+                                        <td style={styles.td}>
+                                            {r.changed_from_baseline ? <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes - influential</span> : <span style={{ color: '#999' }}>No</span>}
+                                        </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </CheckSection>
+
+            <NavButtons currentStep={2} onBack={onBack} onNext={onNext} nextLabel="Continue to Risk Identification →" nextDisabled={!modelCheckResult} />
+        </div>
+    )
+}
+
 //Risiken hinzufügen
-function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, onNext, modelCheckLoading, modelCheckResult, modelCheckError, runModelCheck, occlusionApplicantId, setOcclusionApplicantId, occlusionLoading, occlusionResult, occlusionError, runOcclusionTest,}) {
-    //Filtern der Risiken anhand domain und phase
-    const filtered = RISK_CATALOG.filter(r =>
+function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel}) {    const filtered = RISK_CATALOG.filter(r =>
         (!scope.domain || r.domains.includes(scope.domain)) &&
         (!scope.phase || r.phases.includes(scope.phase))
     ).sort((a, b) => {
@@ -958,7 +1329,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    current_step: 3,
+                    current_step: 4,
                     risks: risks,
                 }),
             })
@@ -976,196 +1347,20 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
                     ? `Showing risks for domain "${scope.domain}" · stage "${scope.phase}"`
                     : 'All catalog risks shown - no scope filter active.'}
             </p>
+            {(modelCheckResult || occlusionResult) && (
+                <button
+                    onClick={onOpenModelCheckPanel}
+                    style={{ ...styles.buttonOutline, marginBottom: '16px', display: 'block' }}
+                >
+                    View AI Model Check Results
+                </button>
+            )}
             <div style={{ ...styles.card, marginBottom: '16px', background: '#f0f7ff', border: '1px solid #b3d9f7' }}>
                 <p style={{ margin: 0, fontSize: '13px', color: '#1565c0' }}>
                     <strong>{risks.length}</strong> risk{risks.length !== 1 ? 's' : ''} selected so far. Select all risks relevant to your AI system. You will evaluate Likelihood and Impact in the next step.
                 </p>
             </div>
 
-            <div style={{ ...styles.card, marginBottom: '16px', background: '#f0f7ff', border: '1px solid #b3d9f7' }}>
-                <h3 style={{ marginTop: 0, fontSize: '15px' }}>AI Model Technical Check</h3>
-                <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
-                    Runs the connected AI system (Gemma-3-1B via Ollama) against a small test set of credit applications
-                    to measure Accuracy, Counterfactual Fairness, Precision, Recall, Specificity, and F1-Score. Run this before
-                    selecting risks below, so the selection can be informed by the technical evidence.
-                </p>
-                <button
-                    onClick={runModelCheck}
-                    disabled={modelCheckLoading}
-                    style={{ ...styles.button, marginTop: 0, opacity: modelCheckLoading ? 0.6 : 1, cursor: modelCheckLoading ? 'not-allowed' : 'pointer' }}
-                >
-                    {modelCheckLoading ? 'Running Test...' : 'Run AI Model Check'}
-                </button>
-
-                {modelCheckError && (
-                    <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
-                        <p style={{ margin: 0, fontSize: '13px', color: '#c62828' }}>{modelCheckError}</p>
-                    </div>
-                )}
-
-                {modelCheckResult && (
-                    <div style={{ marginTop: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                        <div style={{ flex: 1, minWidth: '180px', padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
-                            <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Accuracy</div>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e' }}>
-                                {Math.round(modelCheckResult.accuracy * 100)}%
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#999', marginBottom: '8px' }}>
-                                over {modelCheckResult.sample_size} test applicants
-                            </div>
-                            <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
-                                {interpretAccuracy(modelCheckResult.accuracy)}
-                            </p>
-                        </div>
-                        <div style={{ flex: 1, minWidth: '180px', padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
-                            <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Counterfactual Fairness</div>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: modelCheckResult.counterfactual_fairness > 0.1 ? '#c62828' : '#2e7d32' }}>
-                                {modelCheckResult.counterfactual_fairness}
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#999', marginBottom: '8px' }}>
-                                share of paired applicants (identical data, different gender) whose decision flipped
-                            </div>
-                            <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
-                                {interpretFairness(modelCheckResult.counterfactual_fairness)}
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {modelCheckResult && (
-                    <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                        {/*Jedes der Kästchen ernscheint nur wenn Wert nicht null ist*/}
-                        {modelCheckResult.precision !== null && (
-                            <div style={{ padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
-                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Precision</div>
-                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>
-                                    {modelCheckResult.precision}
-                                </div>
-                                <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
-                                    {interpretPrecision(modelCheckResult.precision)}
-                                </p>
-                            </div>
-                        )}
-                        {modelCheckResult.recall !== null && (
-                            <div style={{ padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
-                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Recall</div>
-                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>
-                                    {modelCheckResult.recall}
-                                </div>
-                                <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
-                                    {interpretRecall(modelCheckResult.recall)}
-                                </p>
-                            </div>
-                        )}
-                        {modelCheckResult.specificity !== null && (
-                            <div style={{ padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
-                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Specificity</div>
-                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>
-                                    {modelCheckResult.specificity}
-                                </div>
-                                <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
-                                    {interpretSpecificity(modelCheckResult.specificity)}
-                                </p>
-                            </div>
-                        )}
-                        {modelCheckResult.f1_score !== null && (
-                            <div style={{ padding: '14px', background: 'white', borderRadius: '8px', border: '1px solid #d6e8f5' }}>
-                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>F1-Score</div>
-                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1a1a2e', marginBottom: '8px' }}>
-                                    {modelCheckResult.f1_score}
-                                </div>
-                                <p style={{ fontSize: '12px', color: '#5a5a5a', margin: 0, borderTop: '1px solid #eee', paddingTop: '8px' }}>
-                                    {interpretF1(modelCheckResult.f1_score)}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/*unklare Antworten*/}
-                {modelCheckResult && modelCheckResult.unclear_count > 0 && (
-                    <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px' }}>
-                        <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
-                            {modelCheckResult.unclear_count} response(s) could not be clearly classified as "approved" or "rejected"
-                            and were excluded from Precision/Recall/Specificity/F1. (Note: They still count as
-                            incorrect in Accuracy, and may still affect Counterfactual Fairness above.)
-                        </p>
-                    </div>
-                )}
-            </div>
-
-            <div style={{ ...styles.card, marginBottom: '16px', background: '#f0f7ff', border: '1px solid #b3d9f7' }}>
-                <h3 style={{ marginTop: 0, fontSize: '15px' }}>AI Model Explainability Check (Occlusion)</h3>
-                <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
-                    Removes one input field at a time from a single test applicant to see which features actually
-                    influence the model's decision.
-                </p>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px' }}>
-                    <label style={{ ...styles.label, marginBottom: 0 }}>Test applicant:</label>
-                    <select
-                        style={{ ...styles.input, width: '80px' }}
-                        value={occlusionApplicantId}
-                        onChange={e => setOcclusionApplicantId(Number(e.target.value))}
-                    >
-                        {Array.from({ length: 10 }, (_, i) => i + 1).map(id => (
-                            <option key={id} value={id}>#{id}</option>
-                        ))}
-                    </select>
-                    <button
-                        onClick={runOcclusionTest}
-                        disabled={occlusionLoading}
-                        style={{ ...styles.button, marginTop: 0, opacity: occlusionLoading ? 0.6 : 1, cursor: occlusionLoading ? 'not-allowed' : 'pointer' }}
-                    >
-                        {occlusionLoading ? 'Running Test...' : 'Run Occlusion Test'}
-                    </button>
-                </div>
-
-                {occlusionError && (
-                    <div style={{ padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
-                        <p style={{ margin: 0, fontSize: '13px', color: '#c62828' }}>{occlusionError}</p>
-                    </div>
-                )}
-
-                {occlusionResult && (
-                    <div style={{ marginTop: '12px' }}>
-                        <p style={{ fontSize: '13px', marginBottom: '10px' }}>
-                            Baseline decision (all fields present): <strong>{occlusionResult.baseline_decision}</strong>
-                        </p>
-                        <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
-                            {(() => {
-                                const influential = occlusionResult.occlusion_results.filter(r => r.changed_from_baseline).map(r => r.omitted_field)
-                                return influential.length === 0
-                                    ? "No single field changed the decision when removed - the model's decision appears to rely on the combination of all fields together, or is not clearly sensitive to any one feature in this test."
-                                    : `The decision changed when removing: ${influential.join(', ')}. This suggests these fields carry the most weight in this specific case - worth checking whether that matches what a credit officer should actually prioritize.`
-                            })()}
-                        </p>
-                        <table style={styles.table}>
-                            <thead>
-                            <tr>
-                                <th style={styles.th}>Field removed</th>
-                                <th style={styles.th}>Decision without it</th>
-                                <th style={styles.th}>Changed the outcome?</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {occlusionResult.occlusion_results.map(r => (
-                                <tr key={r.omitted_field}>
-                                    <td style={styles.td}>{r.omitted_field}</td>
-                                    <td style={styles.td}>{r.decision_without_field}</td>
-                                    <td style={styles.td}>
-                                        {r.changed_from_baseline ? (
-                                            <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes - influential</span>
-                                        ) : (
-                                            <span style={{ color: '#999' }}>No</span>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
             {/*Falls gar keine Risiken, statt leerer Seite*/}
             {filtered.length === 0 && <div style={styles.card}><p>No risks found for the selected context. Please adjust your scope.</p></div>}
 
@@ -1196,7 +1391,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
                 )
             })}
             {/*Blockieren solange gar kein Risiko ausgewählt ist*/}
-            <NavButtons currentStep={2} onBack={onBack} onNext={saveAndContinue} nextDisabled={risks.length === 0} nextLabel={`Continue with ${risks.length} risk${risks.length !== 1 ? 's' : ''} →`} />
+            <NavButtons currentStep={3} onBack={onBack} onNext={saveAndContinue} nextDisabled={risks.length === 0} nextLabel={`Continue with ${risks.length} risk${risks.length !== 1 ? 's' : ''} →`} />
         </div>
     )
 }
@@ -1229,7 +1424,7 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    current_step: 4,
+                    current_step: 5,
                     risks: risks,
                 }),
             })
@@ -1305,7 +1500,7 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
                 )
             })}
 
-            <NavButtons currentStep={3} onBack={onBack} onNext={saveAndContinue} nextLabel="Continue to Treatment →" />
+            <NavButtons currentStep={4} onBack={onBack} onNext={saveAndContinue} nextLabel="Continue to Treatment →" />
         </div>
     )
 }
@@ -1487,7 +1682,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
             await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ current_step: 5, risks: risks }),
+                body: JSON.stringify({ current_step: 6, risks: risks }),
             })
         } catch (error) {
             console.error('Failed to save treatment step:', error)
@@ -1875,7 +2070,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
             })}
 
             <NavButtons
-                currentStep={4}
+                currentStep={5}
                 onBack={onBack}
                 onNext={saveAndContinue}
                 nextDisabled={!allGreen}
@@ -2052,7 +2247,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
                     </div>
                 )}
             </div>
-            <NavButtons currentStep={5} onBack={onBack} onNext={finish} nextLabel="Finish" />
+            <NavButtons currentStep={6} onBack={onBack} onNext={finish} nextLabel="Finish" />
         </div>
     )
 }
@@ -2110,42 +2305,105 @@ export default function App() {
     const [extendedValidationResult, setExtendedValidationResult] = useState(null)
     const [occlusionAggregatedResult, setOcclusionAggregatedResult] = useState(null)
 
+    const [dataSource, setDataSource] = useState(null) //null | 'builtin' | 'upload'
+    const [uploadedFile, setUploadedFile] = useState(null)
+    const [uploadedRows, setUploadedRows] = useState([])
+    const [selectedUploadRowIndex, setSelectedUploadRowIndex] = useState(0)
+
+    const [customPrompt, setCustomPrompt] = useState('')
+    const [positiveLabel, setPositiveLabel] = useState('')
+    const [negativeLabel, setNegativeLabel] = useState('')
+
     //Beim Pagewechsel oben beginnen
     useEffect(() => {
         window.scrollTo(0, 0)
     }, [currentStep])
 
-    //AI Test
+    //AI Test - nutzt je nach dataSource entweder die eingebauten Testdaten oder eine hochgeladene Datei
+    //Bei Domain != Finance wird zusätzlich customPrompt + die Labels mitgeschickt
     async function runModelCheck() {
         setModelCheckLoading(true)
         setModelCheckError(null)
         try {
-            const response = await fetch('http://127.0.0.1:8000/credit-metrics')
-            if (!response.ok) throw new Error('Backend returned an error')
+            let response
+            if (dataSource === 'upload' && uploadedFile) {
+                const formData = new FormData()
+                formData.append('file', uploadedFile)
+                formData.append('custom_prompt', customPrompt)
+                formData.append('positive_label', positiveLabel)
+                formData.append('negative_label', negativeLabel)
+
+                response = await fetch('http://127.0.0.1:8000/upload-applicants', {
+                    method: 'POST',
+                    body: formData,
+                })
+            } else {
+                response = await fetch('http://127.0.0.1:8000/credit-metrics')
+            }
+            if (!response.ok) {
+                const errData = await response.json().catch(() => null)
+                throw new Error(errData?.detail || 'Backend returned an error')
+            }
             const data = await response.json()
             setModelCheckResult(data)
         } catch (error) {
             console.error('Model check failed:', error)
-            setModelCheckError('Could not reach the AI model.')
+            setModelCheckError(error.message || 'Could not reach the AI model.')
         }
         setModelCheckLoading(false)
     }
 
-    //AI Test
+    //AI Test - nutzt je nach dataSource entweder einen eingebauten Testantragsteller oder eine ausgewählte Zeile aus dem Upload
+    //Bei Domain != Finance wird zusätzlich customPrompt + die Labels mitgeschickt
     async function runOcclusionTest() {
         setOcclusionLoading(true)
         setOcclusionError(null)
         setOcclusionResult(null)
         try {
-            const response = await fetch(`http://127.0.0.1:8000/occlusion-test/${occlusionApplicantId}`)
+            let response
+            if (dataSource === 'upload') {
+                const applicant = uploadedRows[selectedUploadRowIndex]
+                if (!applicant) throw new Error('No uploaded applicant selected.')
+                const body = { applicant }
+                body.custom_prompt = customPrompt
+                body.positive_label = positiveLabel
+                body.negative_label = negativeLabel
+
+                response = await fetch('http://127.0.0.1:8000/occlusion-test-custom', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                })
+            } else {
+                response = await fetch(`http://127.0.0.1:8000/occlusion-test/${occlusionApplicantId}`)
+            }
             if (!response.ok) throw new Error('Backend returned an error')
             const data = await response.json()
             setOcclusionResult(data)
         } catch (error) {
             console.error('Occlusion test failed:', error)
-            setOcclusionError('Could not reach the AI model.')
+            setOcclusionError(error.message || 'Could not reach the AI model.')
         }
         setOcclusionLoading(false)
+    }
+
+    //Wird aufgerufen, wenn der User eine Datei auswählt - liest sie ein und parsed sie fürs Occlusion-Dropdown
+    function handleFileSelect(file) {
+        setUploadedFile(file)
+        setUploadedRows([])
+        setSelectedUploadRowIndex(0)
+        if (!file) return
+
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            try {
+                const rows = parseCSV(e.target.result)
+                setUploadedRows(rows)
+            } catch (err) {
+                console.error('Failed to parse CSV:', err)
+            }
+        }
+        reader.readAsText(file)
     }
 
     //Neues assessment anlegen
@@ -2200,17 +2458,29 @@ export default function App() {
 
     function renderStep() {
         switch (currentStep) {
-            case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} assessmentId={assessmentId} previousPhase={previousPhase} onNext={() => setCurrentStep(2)} />
-            case 2: return <StepRiskIdentification
-                scope={scope} risks={risks} setRisks={setRisks} assessmentId={assessmentId}
-                onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)}
+            case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} assessmentId={assessmentId} previousPhase={previousPhase} onNext={() => setCurrentStep(2)} onDomainChange={resetModelCheckState} />
+            case 2: return <StepModelCheck
+                scope={scope}
                 modelCheckLoading={modelCheckLoading} modelCheckResult={modelCheckResult} modelCheckError={modelCheckError} runModelCheck={runModelCheck}
                 occlusionApplicantId={occlusionApplicantId} setOcclusionApplicantId={setOcclusionApplicantId}
                 occlusionLoading={occlusionLoading} occlusionResult={occlusionResult} occlusionError={occlusionError} runOcclusionTest={runOcclusionTest}
+                onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)}
+                dataSource={dataSource} setDataSource={setDataSource}
+                uploadedFile={uploadedFile} onFileSelect={handleFileSelect}
+                uploadedRows={uploadedRows} selectedUploadRowIndex={selectedUploadRowIndex} setSelectedUploadRowIndex={setSelectedUploadRowIndex}
+                customPrompt={customPrompt} setCustomPrompt={setCustomPrompt}
+                positiveLabel={positiveLabel} setPositiveLabel={setPositiveLabel}
+                negativeLabel={negativeLabel} setNegativeLabel={setNegativeLabel}
             />
-            case 3: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} />
-            case 4: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} mitigatedResult={mitigatedResult} setMitigatedResult={setMitigatedResult} extendedValidationResult={extendedValidationResult} setExtendedValidationResult={setExtendedValidationResult} occlusionAggregatedResult={occlusionAggregatedResult} setOcclusionAggregatedResult={setOcclusionAggregatedResult} />
-            case 5: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} onFinish={() => setScreen('landing')} />
+            case 3: return <StepRiskIdentification
+                scope={scope} risks={risks} setRisks={setRisks} assessmentId={assessmentId}
+                onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)}
+                modelCheckResult={modelCheckResult} occlusionResult={occlusionResult}
+                onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)}
+            />
+            case 4: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} />
+            case 5: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} onNext={() => setCurrentStep(6)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} mitigatedResult={mitigatedResult} setMitigatedResult={setMitigatedResult} extendedValidationResult={extendedValidationResult} setExtendedValidationResult={setExtendedValidationResult} occlusionAggregatedResult={occlusionAggregatedResult} setOcclusionAggregatedResult={setOcclusionAggregatedResult} />
+            case 6: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(5)} onFinish={() => setScreen('landing')} />
             default: return null
         }
     }
@@ -2232,8 +2502,33 @@ export default function App() {
         setMitigatedResult(null)
         setExtendedValidationResult(null)
         setOcclusionAggregatedResult(null)
+        setDataSource(null)
+        setUploadedFile(null)
+        setUploadedRows([])
+        setSelectedUploadRowIndex(0)
+        setCustomPrompt('')
+        setPositiveLabel('')
+        setNegativeLabel('')
         setCurrentStep(1)
         setScreen('form')
+    }
+
+    //Setzt nur die AI-Model-Check-bezogenen States zurück (z.B. wenn sich die Domain ändert)
+    function resetModelCheckState() {
+        setModelCheckResult(null)
+        setModelCheckError(null)
+        setOcclusionResult(null)
+        setOcclusionError(null)
+        setMitigatedResult(null)
+        setExtendedValidationResult(null)
+        setOcclusionAggregatedResult(null)
+        setDataSource(null)
+        setUploadedFile(null)
+        setUploadedRows([])
+        setSelectedUploadRowIndex(0)
+        setCustomPrompt('')
+        setPositiveLabel('')
+        setNegativeLabel('')
     }
 
     if (screen === 'landing') return <LandingPage onStart={resetAll} onResume={handleResume} />

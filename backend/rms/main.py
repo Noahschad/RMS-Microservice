@@ -1,5 +1,8 @@
 import os
 import requests #Schickt HTTP Anfragen an Ollama
+import csv
+import io
+from fastapi import UploadFile, File, Form
 from test_data import CREDIT_APPLICANTS
 from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
@@ -19,13 +22,15 @@ MONGO_DB_NAME = os.getenv("MONGO_DB_NAME")
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "phi3:mini"
 
-#Übersetzen der Textantwort in eine der drei Kategorien
-def extract_decision(model_response: str) -> str:
+#Übersetzen der Textantwort in eine der drei Kategorien - jetzt mit konfigurierbaren Labels statt fest "approved"/"rejected"
+def extract_decision(model_response: str, positive_label: str = "approved", negative_label: str = "rejected") -> str:
     last_line = model_response.strip().splitlines()[-1].strip().lower()
-    if "approv" in last_line:
-        return "approved"
-    if "reject" in last_line:
-        return "rejected"
+    pos = positive_label.strip().lower()
+    neg = negative_label.strip().lower()
+    if pos in last_line:
+        return positive_label
+    if neg in last_line:
+        return negative_label
     return "unclear"
 
 #Prompt
@@ -58,6 +63,30 @@ def build_credit_prompt(applicant: dict, omit_field: str = None) -> str:
         f"{data_lines}\n\n"
         "First, briefly reason about the applicant's financial situation in one or two sentences. "
         "Then, on a new line, write only a single word as your final decision: either 'approved' or 'rejected'."
+    )
+
+#Baut einen Prompt aus einem freien, vom User definierten Aufgabentext + Beliebigen Spalten aus der CSV
+#(anders als build_credit_prompt: kennt keine festen Feldnamen, nutzt einfach alle Spalten außer ground_truth)
+def build_custom_prompt(applicant: dict, task_description: str, positive_label: str, negative_label: str, omit_field: str = None) -> str:
+    #Alle Spalten außer ground_truth werden als Datenzeilen verwendet
+    usable_items = [
+        (key, value) for key, value in applicant.items()
+        if key != "ground_truth"
+           and key != omit_field
+           and str(value).strip().lower() not in ("n/a", "", "none")
+    ]
+
+    #Aus "existing_debt" wird "Existing debt", damit es lesbar aussieht
+    def humanize(key: str) -> str:
+        return key.replace("_", " ").capitalize()
+
+    data_lines = "\n".join(f"{humanize(key)}: {value}" for key, value in usable_items)
+
+    return (
+        f"{task_description.strip()}\n\n"
+        f"{data_lines}\n\n"
+        f"First, briefly reason about this case in one or two sentences. "
+        f"Then, on a new line, write only a single word as your final decision: either '{positive_label}' or '{negative_label}'."
     )
 
 #Datenbankverbindung
@@ -247,6 +276,123 @@ def compute_credit_metrics(omit_field: str = None):
         "sample_size": len(results),
     }
 
+#Berechnet Metriken für eine übergebene Liste von Antragstellern (statt CREDIT_APPLICANTS)
+#custom_prompt=None -> nutzt den festen build_credit_prompt (Finance-Fall)
+#custom_prompt gesetzt -> nutzt build_custom_prompt mit den übergebenen Labels (jede andere Domain)
+def compute_credit_metrics_for(applicants: list, omit_field: str = None, custom_prompt: str = None, positive_label: str = "approved", negative_label: str = "rejected"):
+    results = []
+    for applicant in applicants:
+        if custom_prompt:
+            prompt = build_custom_prompt(applicant, custom_prompt, positive_label, negative_label, omit_field=omit_field)
+        else:
+            prompt = build_credit_prompt(applicant, omit_field=omit_field)
+        try:
+            response = requests.post(OLLAMA_URL, json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0,
+                    "seed": 42
+                }
+            })
+            response.raise_for_status()
+            data = response.json()
+            decision = extract_decision(data["response"], positive_label, negative_label)
+        except requests.exceptions.RequestException as e:
+            raise HTTPException(status_code=502, detail=f"Could not reach Ollama: {str(e)}")
+
+        results.append({
+            "model_decision": decision,
+            "ground_truth": applicant.get("ground_truth", "unknown"),
+            "correct": decision == applicant.get("ground_truth"),
+        })
+
+    correct_count = sum(1 for r in results if r["correct"])
+    accuracy = correct_count / len(results) if results else 0
+
+    clear_results = [r for r in results if r["model_decision"] != "unclear"]
+    unclear_count = len(results) - len(clear_results)
+
+    tp = sum(1 for r in clear_results if r["model_decision"] == positive_label and r["ground_truth"] == positive_label)
+    fp = sum(1 for r in clear_results if r["model_decision"] == positive_label and r["ground_truth"] == negative_label)
+    fn = sum(1 for r in clear_results if r["model_decision"] == negative_label and r["ground_truth"] == positive_label)
+    tn = sum(1 for r in clear_results if r["model_decision"] == negative_label and r["ground_truth"] == negative_label)
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else None
+    recall = tp / (tp + fn) if (tp + fn) > 0 else None
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else None
+    f1 = (2 * precision * recall / (precision + recall)) if precision and recall and (precision + recall) > 0 else None
+
+    #Counterfactual Fairness braucht paarweise Vergleichsdaten (z.B. gender-Paare) - bei generischen Custom-Prompt-Daten nicht anwendbar, deshalb None statt einer bedeutungslosen Zahl
+    counterfactual_fairness = None
+    if not custom_prompt:
+        flipped_pairs = 0
+        total_pairs = len(results) // 2
+        for i in range(0, len(results), 2):
+            pair = results[i:i + 2]
+            if len(pair) == 2 and pair[0]["model_decision"] != pair[1]["model_decision"]:
+                flipped_pairs += 1
+        counterfactual_fairness = round(flipped_pairs / total_pairs, 2) if total_pairs > 0 else None
+
+    return {
+        "results": results,
+        "accuracy": round(accuracy, 2),
+        "counterfactual_fairness": counterfactual_fairness,
+        "precision": round(precision, 2) if precision is not None else None,
+        "recall": round(recall, 2) if recall is not None else None,
+        "specificity": round(specificity, 2) if specificity is not None else None,
+        "f1_score": round(f1, 2) if f1 is not None else None,
+        "unclear_count": unclear_count,
+        "sample_size": len(results),
+    }
+
+
+REQUIRED_COLUMNS = ["age", "gender", "income", "employment", "existing_debt",
+                    "requested_amount", "application_type", "loan_goal", "ground_truth"]
+
+#Upload-Endpoint: nimmt eine CSV-Datei entgegen
+#Ohne custom_prompt: erwartet die festen Finance-Spalten (bestehendes Verhalten)
+#Mit custom_prompt: akzeptiert beliebige Spalten, nur "ground_truth" ist Pflicht
+@app.post("/upload-applicants")
+async def upload_applicants(
+        file: UploadFile = File(...),
+        custom_prompt: str = Form(None),
+        positive_label: str = Form("approved"),
+        negative_label: str = Form("rejected"),
+):
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Nur CSV-Dateien werden unterstützt.")
+
+    content = await file.read()
+    text = content.decode("utf-8")
+    reader = csv.DictReader(io.StringIO(text))
+    fieldnames = reader.fieldnames or []
+
+    if custom_prompt:
+        #Freier Modus: nur ground_truth ist zwingend erforderlich
+        if "ground_truth" not in fieldnames:
+            raise HTTPException(status_code=400, detail="Fehlende Spalte: ground_truth")
+        if len(fieldnames) < 2:
+            raise HTTPException(status_code=400, detail="Die Datei benötigt mindestens eine Datenspalte zusätzlich zu ground_truth.")
+    else:
+        #Fester Finance-Modus: alle bekannten Spalten müssen vorhanden sein
+        missing_columns = [col for col in REQUIRED_COLUMNS if col not in fieldnames]
+        if missing_columns:
+            raise HTTPException(status_code=400, detail=f"Fehlende Spalten: {', '.join(missing_columns)}")
+
+    applicants = list(reader)
+    if not applicants:
+        raise HTTPException(status_code=400, detail="Die Datei enthält keine Datensätze.")
+
+    metrics = compute_credit_metrics_for(
+        applicants,
+        custom_prompt=custom_prompt,
+        positive_label=positive_label,
+        negative_label=negative_label,
+    )
+    metrics["source_file"] = file.filename
+    return metrics
 
 #Testet alle Antragssteller + Berechnungen
 @app.get("/credit-metrics")
@@ -307,14 +453,12 @@ def occlusion_aggregated():
         "field_influence_summary": field_influence_summary,
     }
 
-#Occlusion = Testet einen Antragssteller mit je einem fehlenden Feld
-@app.get("/occlusion-test/{applicant_id}")
-def occlusion_test(applicant_id: int):
-    applicant = next((a for a in CREDIT_APPLICANTS if a["id"] == applicant_id), None)
-    if not applicant:
-        raise HTTPException(status_code=404, detail="Applicant not found")
+ALL_OCCLUDABLE_FIELDS = ["age", "gender", "income", "employment", "existing_debt",
+                         "requested_amount", "application_type", "loan_goal"]
 
-    #Hilfsfunktion
+#Generische Occlusion-Logik, funktioniert mit jedem Applicant (CREDIT_APPLICANTS oder Upload)
+#custom_prompt=None -> Finance-Fall mit fester Feldliste; custom_prompt gesetzt -> beliebige Spalten
+def run_occlusion(applicant: dict, custom_prompt: str = None, positive_label: str = "approved", negative_label: str = "rejected"):
     def ask(prompt: str) -> str:
         try:
             response = requests.post(OLLAMA_URL, json={
@@ -327,16 +471,33 @@ def occlusion_test(applicant_id: int):
                 }
             })
             response.raise_for_status()
-            return extract_decision(response.json()["response"])
+            return extract_decision(response.json()["response"], positive_label, negative_label)
         except requests.exceptions.RequestException as e:
             raise HTTPException(status_code=502, detail=f"Could not reach Ollama: {str(e)}")
 
-    baseline_decision = ask(build_credit_prompt(applicant))
+    def make_prompt(omit_field=None):
+        if custom_prompt:
+            return build_custom_prompt(applicant, custom_prompt, positive_label, negative_label, omit_field=omit_field)
+        return build_credit_prompt(applicant, omit_field=omit_field)
 
-    occludable_fields = ["age", "gender", "income", "employment", "existing_debt", "requested_amount"]
+    baseline_decision = ask(make_prompt())
+
+    if custom_prompt:
+        #Freier Modus: alle Spalten außer ground_truth sind occludable
+        occludable_fields = [
+            k for k in applicant.keys()
+            if k != "ground_truth" and str(applicant.get(k, "n/a")).strip().lower() not in ("n/a", "", "none")
+        ]
+    else:
+        #Fester Finance-Modus: nur die bekannte Feldliste
+        occludable_fields = [
+            f for f in ALL_OCCLUDABLE_FIELDS
+            if str(applicant.get(f, "n/a")).strip().lower() not in ("n/a", "", "none")
+        ]
+
     occlusion_results = []
     for field in occludable_fields:
-        decision_without_field = ask(build_credit_prompt(applicant, omit_field=field))
+        decision_without_field = ask(make_prompt(omit_field=field))
         occlusion_results.append({
             "omitted_field": field,
             "decision_without_field": decision_without_field,
@@ -344,10 +505,37 @@ def occlusion_test(applicant_id: int):
         })
 
     return {
-        "applicant_id": applicant_id,
         "baseline_decision": baseline_decision,
         "occlusion_results": occlusion_results,
     }
+
+
+#Occlusion für einen der eingebauten Testantragsteller
+@app.get("/occlusion-test/{applicant_id}")
+def occlusion_test(applicant_id: int):
+    applicant = next((a for a in CREDIT_APPLICANTS if a["id"] == applicant_id), None)
+    if not applicant:
+        raise HTTPException(status_code=404, detail="Applicant not found")
+
+    result = run_occlusion(applicant)
+    result["applicant_id"] = applicant_id
+    return result
+
+
+#Occlusion für einen einzelnen, vom Frontend übergebenen Antragsteller (z.B. aus einem Upload)
+#Unterstützt jetzt auch custom_prompt für nicht-Finance-Domains
+@app.post("/occlusion-test-custom")
+async def occlusion_test_custom(payload: dict):
+    applicant = payload.get("applicant")
+    if not applicant:
+        raise HTTPException(status_code=400, detail="No applicant data provided.")
+
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
+
+    result = run_occlusion(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
+    return result
 
 #Assessment Endpoints
 @app.post("/assessments") #neues Assessment anlegen
