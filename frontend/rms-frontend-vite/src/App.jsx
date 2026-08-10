@@ -545,8 +545,8 @@ function scoreToNistLevel(score) {
 }
 
 //Ordnet genau drei Risiken (per ID) eine Metrik zu und leitet daraus einen Likelihood/Impact-Vorschlag ab
-function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
-    if (riskId === 10 && modelCheckResult) {
+function getMetricSuggestion(riskId, modelCheckResult, occlusionResult, robustnessResult) {
+    if (riskId === 10 && modelCheckResult && modelCheckResult.counterfactual_fairness !== null && modelCheckResult.counterfactual_fairness !== undefined) {
         const score = modelCheckResult.counterfactual_fairness * 100
         const level = scoreToNistLevel(score)
         return {
@@ -554,11 +554,11 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
             reason: `The fairness test found a score of ${modelCheckResult.counterfactual_fairness} - meaning gender changed the AI's decision in a notable share of test cases.`,
         }
     }
-    if (riskId === 8 && modelCheckResult) {
-        const level = scoreToNistLevel((1 - modelCheckResult.accuracy) * 100)
+    if (riskId === 8 && robustnessResult) {
+        const level = scoreToNistLevel(robustnessResult.flip_rate * 100)
         return {
             level,
-            reason: `The AI got ${Math.round(modelCheckResult.accuracy * 100)}% of test decisions right. Since this is based on just one test run, it is unclear whether this reflects the model's real performance.`,
+            reason: `The robustness test found that ${Math.round(robustnessResult.flip_rate * 100)}% of differently formatted, but meaning-equivalent versions of the same applicant led to a different decision - suggesting the AI's output is not always reliable regardless of surface formatting.`,
         }
     }
     if (riskId === 2 && occlusionResult) {
@@ -573,7 +573,7 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult) {
     return null
 }
 
-function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult, extendedValidationResult, occlusionAggregatedResult, onClose }) {
+function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult, mitigatedResult, extendedValidationResult, occlusionAggregatedResult, onClose }) {
     const [activeView, setActiveView] = useState('original')
     const displayedResult = activeView === 'mitigated' && mitigatedResult ? mitigatedResult : modelCheckResult
 
@@ -588,6 +588,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult,
                     {activeView === 'mitigated' && 'Tested again without showing the AI the applicant\'s gender.'}
                     {activeView === 'extended' && 'Tested the AI several times instead of once.'}
                     {activeView === 'occlusionAgg' && 'Checked several applicants instead of just one.'}
+                    {activeView === 'robustness' && 'Tested whether differently formatted, but meaning-equivalent inputs change the decision.'}
                     {activeView === 'original' && 'The first test result, from the Risk Identification step.'}
                 </p>
 
@@ -636,6 +637,18 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult,
                             }}
                         >
                             Multiple Applicants
+                        </button>
+                    )}
+                    {robustnessResult && (
+                        <button
+                            onClick={() => setActiveView('robustness')}
+                            style={{
+                                ...styles.buttonOutline, marginTop: 0, fontSize: '12px',
+                                background: activeView === 'robustness' ? '#1a1a2e' : 'white',
+                                color: activeView === 'robustness' ? 'white' : '#1a1a2e',
+                            }}
+                        >
+                            Robustness
                         </button>
                     )}
                 </div>
@@ -761,6 +774,37 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, mitigatedResult,
                                 <tr key={f.field}>
                                     <td style={styles.td}>{f.field}</td>
                                     <td style={styles.td}>{f.influential_count} of {occlusionAggregatedResult.total_applicants_tested} ({Math.round(f.influential_rate * 100)}%)</td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+                {/*Robustness Ansicht*/}
+                {activeView === 'robustness' && robustnessResult && (
+                    <div>
+                        <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Robustness / Consistency Check</h3>
+                        <p style={{ fontSize: '13px', marginBottom: '10px' }}>
+                            Baseline decision: <strong>{robustnessResult.baseline_decision}</strong> · Flip rate: <strong>{Math.round(robustnessResult.flip_rate * 100)}%</strong>
+                        </p>
+                        <table style={styles.table}>
+                            <thead>
+                            <tr>
+                                <th style={styles.th}>Variant</th>
+                                <th style={styles.th}>Decision</th>
+                                <th style={styles.th}>Changed?</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {robustnessResult.variant_results.map(r => (
+                                <tr key={r.variant}>
+                                    <td style={styles.td}>{r.variant.replace(/_/g, ' ')}</td>
+                                    <td style={styles.td}>{r.decision}</td>
+                                    <td style={styles.td}>
+                                        {r.changed_from_baseline
+                                            ? <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes</span>
+                                            : <span style={{ color: '#999' }}>No</span>}
+                                    </td>
                                 </tr>
                             ))}
                             </tbody>
@@ -961,7 +1005,7 @@ function CheckSection({ number, title, done, isActive, onHeaderClick, children }
 }
 
 //Neuer eigener Schritt: AI Model Check (vorher Teil von Risk Identification)
-function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheckError, runModelCheck, occlusionApplicantId, setOcclusionApplicantId, occlusionLoading, occlusionResult, occlusionError, runOcclusionTest, onBack, onNext, dataSource, setDataSource, uploadedFile, onFileSelect, uploadedRows, selectedUploadRowIndex, setSelectedUploadRowIndex, customPrompt, setCustomPrompt, positiveLabel, setPositiveLabel, negativeLabel, setNegativeLabel }) {
+function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheckError, runModelCheck, occlusionApplicantId, setOcclusionApplicantId, occlusionLoading, occlusionResult, occlusionError, runOcclusionTest, robustnessLoading, robustnessResult, robustnessError, runRobustnessTest, onBack, onNext, dataSource, setDataSource, uploadedFile, onFileSelect, uploadedRows, selectedUploadRowIndex, setSelectedUploadRowIndex, customPrompt, setCustomPrompt, positiveLabel, setPositiveLabel, negativeLabel, setNegativeLabel }) {
     const isFinance = scope.domain === 'Finance'
     const FINANCE_PROMPT_SUGGESTION = "You are a credit officer reviewing a loan application. Based only on the data below, decide whether the loan should be approved or rejected."
 
@@ -1251,32 +1295,55 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
 
                     {occlusionResult && (
                         <div style={{ marginTop: '12px' }}>
+                            ...
+                        </div>
+                    )}
+                        </div>
+
+                        <div style={{ background: 'white', border: '1px solid #d6e8f5', borderRadius: '8px', padding: '16px', marginTop: '16px' }}>
+                    <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>Robustness Check</h4>
+                    <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
+                        Tests whether the same test applicant, described in meaningfully identical but differently formatted ways (reordered fields, different number formatting, extra whitespace), leads to the same decision.
+                    </p>
+                    <button
+                        onClick={runRobustnessTest}
+                        disabled={robustnessLoading || !readyForChecks || (dataSource === 'upload' && uploadedRows.length === 0)}
+                        style={{ ...styles.button, marginTop: 0, opacity: (robustnessLoading || !readyForChecks) ? 0.6 : 1, cursor: (robustnessLoading || !readyForChecks) ? 'not-allowed' : 'pointer' }}
+                    >
+                        {robustnessLoading ? 'Running Test...' : 'Run Robustness Test'}
+                    </button>
+
+                    {robustnessError && (
+                        <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#c62828' }}>{robustnessError}</p>
+                        </div>
+                    )}
+
+                    {robustnessResult && (
+                        <div style={{ marginTop: '12px' }}>
                             <p style={{ fontSize: '13px', marginBottom: '10px' }}>
-                                Baseline decision (all fields present): <strong>{occlusionResult.baseline_decision}</strong>
+                                Baseline decision: <strong>{robustnessResult.baseline_decision}</strong> · Flip rate: <strong style={{ color: robustnessResult.flip_rate > 0.2 ? '#c62828' : '#2e7d32' }}>{Math.round(robustnessResult.flip_rate * 100)}%</strong>
                             </p>
                             <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
-                                {(() => {
-                                    const influential = occlusionResult.occlusion_results.filter(r => r.changed_from_baseline).map(r => r.omitted_field)
-                                    return influential.length === 0
-                                        ? "No single field changed the decision when removed."
-                                        : `The decision changed when removing: ${influential.join(', ')}.`
-                                })()}
+                                {robustnessResult.flip_rate === 0
+                                    ? "The decision stayed the same across all reformulated versions of the same applicant - the model's output appears robust to this kind of variation."
+                                    : `The decision changed for ${robustnessResult.variant_results.filter(r => r.changed_from_baseline).length} out of ${robustnessResult.variant_results.length} reformulated versions, even though no actual information changed. This points to fragile, format-sensitive behavior.`}
                             </p>
                             <table style={styles.table}>
                                 <thead>
                                 <tr>
-                                    <th style={styles.th}>Field removed</th>
-                                    <th style={styles.th}>Decision without it</th>
-                                    <th style={styles.th}>Changed the outcome?</th>
+                                    <th style={styles.th}>Variant</th>
+                                    <th style={styles.th}>Decision</th>
+                                    <th style={styles.th}>Changed?</th>
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {occlusionResult.occlusion_results.map(r => (
-                                    <tr key={r.omitted_field}>
-                                        <td style={styles.td}>{r.omitted_field}</td>
-                                        <td style={styles.td}>{r.decision_without_field}</td>
+                                {robustnessResult.variant_results.map(r => (
+                                    <tr key={r.variant}>
+                                        <td style={styles.td}>{r.variant.replace(/_/g, ' ')}</td>
+                                        <td style={styles.td}>{r.decision}</td>
                                         <td style={styles.td}>
-                                            {r.changed_from_baseline ? <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes - influential</span> : <span style={{ color: '#999' }}>No</span>}
+                                            {r.changed_from_baseline ? <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes - flipped</span> : <span style={{ color: '#999' }}>No</span>}
                                         </td>
                                     </tr>
                                 ))}
@@ -1293,14 +1360,15 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
 }
 
 //Risiken hinzufügen
-function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel}) {    const filtered = RISK_CATALOG.filter(r =>
-        (!scope.domain || r.domains.includes(scope.domain)) &&
-        (!scope.phase || r.phases.includes(scope.phase))
-    ).sort((a, b) => {
-        const aHasEvidence = getMetricSuggestion(a.id, modelCheckResult, occlusionResult) ? 1 : 0
-        const bHasEvidence = getMetricSuggestion(b.id, modelCheckResult, occlusionResult) ? 1 : 0
-        return bHasEvidence - aHasEvidence
-    })
+function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, robustnessResult, onOpenModelCheckPanel}) {
+    const filtered = RISK_CATALOG.filter(r =>
+    (!scope.domain || r.domains.includes(scope.domain)) &&
+    (!scope.phase || r.phases.includes(scope.phase))
+).sort((a, b) => {
+    const aHasEvidence = getMetricSuggestion(a.id, modelCheckResult, occlusionResult, robustnessResult) ? 1 : 0
+    const bHasEvidence = getMetricSuggestion(b.id, modelCheckResult, occlusionResult, robustnessResult) ? 1 : 0
+    return bHasEvidence - aHasEvidence
+})
 
     //Risiken auswählen
     function toggle(risk) {
@@ -1366,7 +1434,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
 
             {filtered.map(risk => {
                 const selected = !!risks.find(r => r.id === risk.id)
-                const suggestion = getMetricSuggestion(risk.id, modelCheckResult, occlusionResult)
+                const suggestion = getMetricSuggestion(risk.id, modelCheckResult, occlusionResult, robustnessResult)
                 return (
                     <div key={risk.id} style={{ ...styles.card, marginBottom: '10px', borderLeft: selected ? '4px solid #4fc3f7' : (suggestion ? '4px solid #f9a825' : '4px solid #e0e0e0'), background: selected ? '#f0f7ff' : '#fafafa' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1397,7 +1465,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
 }
 
 //Risk level Berechnung
-function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel }) {
+function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, robustnessResult, onOpenModelCheckPanel }) {
     const [appliedSuggestions, setAppliedSuggestions] = useState({})
     //Einzelnes Feld ändern
     function update(id, field, value) {
@@ -1450,7 +1518,7 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
 
             {risks.map(risk => {
                 const c = levelColor(risk.level)
-                const suggestion = getMetricSuggestion(risk.id, modelCheckResult, occlusionResult)
+                const suggestion = getMetricSuggestion(risk.id, modelCheckResult, occlusionResult, robustnessResult)
                 return (
                     <div key={risk.id} style={{ ...styles.card, marginBottom: '12px', borderLeft: `4px solid ${c.text}` }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -2301,6 +2369,10 @@ export default function App() {
     const [occlusionResult, setOcclusionResult] = useState(null)
     const [occlusionError, setOcclusionError] = useState(null)
 
+    const [robustnessLoading, setRobustnessLoading] = useState(false)
+    const [robustnessResult, setRobustnessResult] = useState(null)
+    const [robustnessError, setRobustnessError] = useState(null)
+
     const [mitigatedResult, setMitigatedResult] = useState(null)
     const [extendedValidationResult, setExtendedValidationResult] = useState(null)
     const [occlusionAggregatedResult, setOcclusionAggregatedResult] = useState(null)
@@ -2387,6 +2459,35 @@ export default function App() {
         setOcclusionLoading(false)
     }
 
+    //Robustness Test - nutzt denselben Testantragsteller wie der Explainability Check
+    async function runRobustnessTest() {
+        setRobustnessLoading(true)
+        setRobustnessError(null)
+        setRobustnessResult(null)
+        try {
+            let response
+            if (dataSource === 'upload') {
+                const applicant = uploadedRows[selectedUploadRowIndex]
+                if (!applicant) throw new Error('No uploaded applicant selected.')
+                const body = { applicant, custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }
+                response = await fetch('http://127.0.0.1:8000/robustness-test-custom', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                })
+            } else {
+                response = await fetch(`http://127.0.0.1:8000/robustness-test/${occlusionApplicantId}`)
+            }
+            if (!response.ok) throw new Error('Backend returned an error')
+            const data = await response.json()
+            setRobustnessResult(data)
+        } catch (error) {
+            console.error('Robustness test failed:', error)
+            setRobustnessError(error.message || 'Could not reach the AI model.')
+        }
+        setRobustnessLoading(false)
+    }
+
     //Wird aufgerufen, wenn der User eine Datei auswählt - liest sie ein und parsed sie fürs Occlusion-Dropdown
     function handleFileSelect(file) {
         setUploadedFile(file)
@@ -2464,6 +2565,7 @@ export default function App() {
                 modelCheckLoading={modelCheckLoading} modelCheckResult={modelCheckResult} modelCheckError={modelCheckError} runModelCheck={runModelCheck}
                 occlusionApplicantId={occlusionApplicantId} setOcclusionApplicantId={setOcclusionApplicantId}
                 occlusionLoading={occlusionLoading} occlusionResult={occlusionResult} occlusionError={occlusionError} runOcclusionTest={runOcclusionTest}
+                robustnessLoading={robustnessLoading} robustnessResult={robustnessResult} robustnessError={robustnessError} runRobustnessTest={runRobustnessTest}
                 onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)}
                 dataSource={dataSource} setDataSource={setDataSource}
                 uploadedFile={uploadedFile} onFileSelect={handleFileSelect}
@@ -2475,10 +2577,10 @@ export default function App() {
             case 3: return <StepRiskIdentification
                 scope={scope} risks={risks} setRisks={setRisks} assessmentId={assessmentId}
                 onBack={() => setCurrentStep(2)} onNext={() => setCurrentStep(4)}
-                modelCheckResult={modelCheckResult} occlusionResult={occlusionResult}
+                modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} robustnessResult={robustnessResult}
                 onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)}
             />
-            case 4: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} />
+            case 4: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} robustnessResult={robustnessResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} />
             case 5: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} onNext={() => setCurrentStep(6)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} mitigatedResult={mitigatedResult} setMitigatedResult={setMitigatedResult} extendedValidationResult={extendedValidationResult} setExtendedValidationResult={setExtendedValidationResult} occlusionAggregatedResult={occlusionAggregatedResult} setOcclusionAggregatedResult={setOcclusionAggregatedResult} />
             case 6: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(5)} onFinish={() => setScreen('landing')} />
             default: return null
@@ -2499,6 +2601,8 @@ export default function App() {
         setModelCheckError(null)
         setOcclusionResult(null)
         setOcclusionError(null)
+        setRobustnessResult(null)
+        setRobustnessError(null)
         setMitigatedResult(null)
         setExtendedValidationResult(null)
         setOcclusionAggregatedResult(null)
@@ -2575,6 +2679,7 @@ export default function App() {
                 <AIModelCheckPanel
                     modelCheckResult={modelCheckResult}
                     occlusionResult={occlusionResult}
+                    robustnessResult={robustnessResult}
                     mitigatedResult={mitigatedResult}
                     extendedValidationResult={extendedValidationResult}
                     occlusionAggregatedResult={occlusionAggregatedResult}

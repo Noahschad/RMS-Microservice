@@ -89,6 +89,78 @@ def build_custom_prompt(applicant: dict, task_description: str, positive_label: 
         f"Then, on a new line, write only a single word as your final decision: either '{positive_label}' or '{negative_label}'."
     )
 
+#Erzeugt mehrere bedeutungsgleiche, aber unterschiedlich formulierte Varianten eines Prompts (Perturbation-based Robustness, Mustroph & Rinderle-Ma 2024, nach Szegedy et al. 2014)
+def build_robustness_variants(applicant: dict, custom_prompt: str = None, positive_label: str = "approved", negative_label: str = "rejected"):
+    base_builder = (lambda a, omit=None: build_custom_prompt(a, custom_prompt, positive_label, negative_label, omit_field=omit)) \
+        if custom_prompt else \
+        (lambda a, omit=None: build_credit_prompt(a, omit_field=omit))
+
+    original_prompt = base_builder(applicant)
+
+    #Variante 1: Feldreihenfolge umkehren
+    reversed_applicant = dict(reversed(list(applicant.items())))
+    variant_reordered = base_builder(reversed_applicant)
+
+    #Variante 2: Zahlenformat mit Tausendertrennzeichen (nur bei numerischen Feldern)
+    def add_thousands_separator(value):
+        try:
+            num = float(value)
+            return f"{num:,.0f}" if num == int(num) else f"{num:,.2f}"
+        except (ValueError, TypeError):
+            return value
+
+    reformatted_applicant = {k: add_thousands_separator(v) for k, v in applicant.items()}
+    variant_reformatted = base_builder(reformatted_applicant)
+
+    #Variante 3: identischer Prompt nochmal, aber mit einer Leerzeile mehr (rein syntaktische Störung)
+    variant_whitespace = original_prompt.replace("\n\n", "\n\n\n", 1)
+
+    return {
+        "original": original_prompt,
+        "reordered_fields": variant_reordered,
+        "reformatted_numbers": variant_reformatted,
+        "extra_whitespace": variant_whitespace,
+    }
+
+#Generische Robustness-Logik: baseline + Varianten, misst Flip-Rate
+def run_robustness_test(applicant: dict, custom_prompt: str = None, positive_label: str = "approved", negative_label: str = "rejected"):
+    def ask(prompt: str) -> str:
+        try:
+            response = requests.post(OLLAMA_URL, json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0, "seed": 42}
+            })
+            response.raise_for_status()
+            return extract_decision(response.json()["response"], positive_label, negative_label)
+        except requests.exceptions.RequestException as e:
+            raise HTTPException(status_code=502, detail=f"Could not reach Ollama: {str(e)}")
+
+    variants = build_robustness_variants(applicant, custom_prompt, positive_label, negative_label)
+    baseline_decision = ask(variants["original"])
+
+    variant_results = []
+    for variant_name, prompt in variants.items():
+        if variant_name == "original":
+            continue
+        decision = ask(prompt)
+        variant_results.append({
+            "variant": variant_name,
+            "decision": decision,
+            "changed_from_baseline": decision != baseline_decision,
+        })
+
+    flipped_count = sum(1 for r in variant_results if r["changed_from_baseline"])
+    flip_rate = round(flipped_count / len(variant_results), 2) if variant_results else 0
+
+    return {
+        "baseline_decision": baseline_decision,
+        "variant_results": variant_results,
+        "flip_rate": flip_rate,
+    }
+
+
 #Datenbankverbindung
 client = MongoClient(MONGO_URI)
 db = client[MONGO_DB_NAME]
@@ -536,6 +608,28 @@ async def occlusion_test_custom(payload: dict):
 
     result = run_occlusion(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
     return result
+
+#Robustness-Test für einen eingebauten Testantragsteller
+@app.get("/robustness-test/{applicant_id}")
+def robustness_test(applicant_id: int):
+    applicant = next((a for a in CREDIT_APPLICANTS if a["id"] == applicant_id), None)
+    if not applicant:
+        raise HTTPException(status_code=404, detail="Applicant not found")
+    result = run_robustness_test(applicant)
+    result["applicant_id"] = applicant_id
+    return result
+
+
+#Robustness-Test für einen vom Frontend übergebenen Antragsteller (z.B. aus einem Upload)
+@app.post("/robustness-test-custom")
+async def robustness_test_custom(payload: dict):
+    applicant = payload.get("applicant")
+    if not applicant:
+        raise HTTPException(status_code=400, detail="No applicant data provided.")
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
+    return run_robustness_test(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
 
 #Assessment Endpoints
 @app.post("/assessments") #neues Assessment anlegen
