@@ -22,14 +22,32 @@ MONGO_DB_NAME = os.getenv("MONGO_DB_NAME")
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "phi3:mini"
 
-#Übersetzen der Textantwort in eine der drei Kategorien - jetzt mit konfigurierbaren Labels statt fest "approved"/"rejected"
+#Übersetzen der Textantwort in eine der drei Kategorien - mit konfigurierbaren Labels
+#Prüft erst auf exakte Übereinstimmung (zuverlässigste Erkennung), dann als Fallback auf Teilstring-Suche,
+#wobei bei Überlappung (z.B. "approved" in "not approved") das längere, spezifischere Label bevorzugt wird
 def extract_decision(model_response: str, positive_label: str = "approved", negative_label: str = "rejected") -> str:
     last_line = model_response.strip().splitlines()[-1].strip().lower()
+    #Satzzeichen am Rand entfernen, damit z.B. "approved." als exakter Treffer erkannt wird
+    cleaned = last_line.strip(" .!:;,\"'")
+
     pos = positive_label.strip().lower()
     neg = negative_label.strip().lower()
-    if pos in last_line:
+
+    #Exakte Übereinstimmung zuerst - das ist der zuverlässigste Fall, da der Prompt genau ein Wort verlangt
+    if cleaned == pos:
         return positive_label
-    if neg in last_line:
+    if cleaned == neg:
+        return negative_label
+
+    #Fallback: Teilstring-Suche. Wenn beide Labels im Text vorkommen (z.B. "approved" innerhalb von
+    #"not approved"), wird das längere, spezifischere Label bevorzugt, um Fehlklassifikationen zu vermeiden
+    pos_found = pos in cleaned
+    neg_found = neg in cleaned
+    if pos_found and neg_found:
+        return positive_label if len(pos) >= len(neg) else negative_label
+    if pos_found:
+        return positive_label
+    if neg_found:
         return negative_label
     return "unclear"
 
