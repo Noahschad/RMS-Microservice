@@ -89,7 +89,7 @@ const TREATMENT_SUGGESTIONS = {
         option: 'Remove risk source',
         note: 'Test the AI again without telling it the applicant\'s gender, and check whether this reduces unfair treatment.',
         hasSimulation: true,
-        simulationButton: 'Apply Fairness Constraints (~1-3min)',
+        simulationButton: 'Apply Fairness Constraints (~2-5min)',
         //simulationResult: 'Fairness check complete. Affected borrower groups identified and corrected. Loan approval rate gap reduced from 31% to 5%.',
         //simulationResidualLikelihood: 'Low',
         //simulationResidualImpact: 'Moderate',
@@ -98,13 +98,13 @@ const TREATMENT_SUGGESTIONS = {
         option: 'Change likelihood',
         note: 'Test the AI multiple times instead of just once, and look at the average and how much the results vary - this makes it less likely that a bad result goes unnoticed after only a single test.',
         hasSimulation: true,
-        simulationButton: 'Run Extended Validation (2 runs, ~3-5 min)',
+        simulationButton: 'Run Extended Validation (2 runs, ~3-6 min)',
     },
     2: {
         option: 'Change likelihood',
         note: 'Rather than relying on a single test case, check whether the same piece of information matters across several applicants. This lowers the chance that an unreliable explanation goes unnoticed.',
         hasSimulation: true,
-        simulationButton: 'Run Occlusion Across Applicants (~3-5 min)',
+        simulationButton: 'Run Occlusion Across Applicants (~5-10 min)',
     },
 }
 
@@ -547,7 +547,9 @@ function scoreToNistLevel(score) {
 //Ordnet genau drei Risiken (per ID) eine Metrik zu und leitet daraus einen Likelihood/Impact-Vorschlag ab
 function getMetricSuggestion(riskId, modelCheckResult, occlusionResult, robustnessResult) {
     if (riskId === 10 && modelCheckResult && modelCheckResult.counterfactual_fairness !== null && modelCheckResult.counterfactual_fairness !== undefined) {
-        const score = modelCheckResult.counterfactual_fairness * 100
+        //IEEE Std 3198-2025 Cl. 7.3.1 setzt die Akzeptanzschwelle bei 0.1, nicht bei 0 - deshalb skalieren relativ zu dieser Schwelle, bevor NIST-Bins anwenden
+        const FAIRNESS_ACCEPTABLE_THRESHOLD = 0.1
+        const score = (modelCheckResult.counterfactual_fairness / FAIRNESS_ACCEPTABLE_THRESHOLD) * 20
         const level = scoreToNistLevel(score)
         return {
             level,
@@ -982,12 +984,16 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
 }
 
 //Ein aufklappbarer, nummerierter Abschnitt für den AI Model Check Flow
-function CheckSection({ number, title, done, isActive, onHeaderClick, children }) {
+function CheckSection({ number, title, done, isActive, onHeaderClick, children, plain }) {
     return (
-        <div style={{ ...styles.card, marginBottom: '16px', background: isActive ? '#f0f7ff' : '#fafafa', border: `1px solid ${isActive ? '#b3d9f7' : '#e0e0e0'}` }}>
+        <div style={{
+            ...styles.card, marginBottom: '16px',
+            background: plain ? 'white' : (isActive ? '#f0f7ff' : '#fafafa'),
+            border: `1px solid ${plain ? '#ddd' : (isActive ? '#b3d9f7' : '#e0e0e0')}`
+        }}>
             <div
                 onClick={onHeaderClick}
-                style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: done ? 'pointer' : 'default' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: onHeaderClick ? 'pointer' : 'default' }}
             >
                 <div style={{
                     width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
@@ -1134,7 +1140,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                             </button>
                         )}
 
-                        <label style={styles.label}>Describe the task for the AI</label>
+                        <label style={styles.label}>Describe the task for the AI <span style={{ color: '#c62828' }}>*</span></label>
                         <FieldHint text="Describe what the AI should decide, in plain language. Do not include the data itself - it will be added automatically below your description." />
                         <textarea
                             style={{ ...styles.input, height: '80px', resize: 'vertical', marginBottom: '12px' }}
@@ -1145,12 +1151,12 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
 
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <div style={{ flex: 1 }}>
-                                <label style={styles.label}>Positive outcome label</label>
+                                <label style={styles.label}>Positive outcome label <span style={{ color: '#c62828' }}>*</span></label>
                                 <FieldHint text='The exact word used for a positive decision in your ground_truth column, e.g. "approved" or "shortlisted".' />
                                 <input style={styles.input} placeholder="e.g. approved" value={positiveLabel} onChange={e => setPositiveLabel(e.target.value)} />
                             </div>
                             <div style={{ flex: 1 }}>
-                                <label style={styles.label}>Negative outcome label</label>
+                                <label style={styles.label}>Negative outcome label <span style={{ color: '#c62828' }}>*</span></label>
                                 <FieldHint text='The exact word used for a negative decision in your ground_truth column, e.g. "rejected".' />
                                 <input style={styles.input} placeholder="e.g. rejected" value={negativeLabel} onChange={e => setNegativeLabel(e.target.value)} />
                             </div>
@@ -1295,7 +1301,41 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
 
                     {occlusionResult && (
                         <div style={{ marginTop: '12px' }}>
-                            ...
+                            <p style={{ fontSize: '13px', marginBottom: '10px' }}>
+                                Baseline decision (all fields present): <strong>{occlusionResult.baseline_decision}</strong>
+                            </p>
+                            <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
+                                {(() => {
+                                    const influential = occlusionResult.occlusion_results.filter(r => r.changed_from_baseline).map(r => r.omitted_field)
+                                    return influential.length === 0
+                                        ? "No single field changed the decision when removed - the model's decision appears to rely on the combination of all fields together, or is not clearly sensitive to any one feature in this test."
+                                        : `The decision changed when removing: ${influential.join(', ')}. This suggests these fields carry the most weight in this specific case.`
+                                })()}
+                            </p>
+                            <table style={styles.table}>
+                                <thead>
+                                <tr>
+                                    <th style={styles.th}>Field removed</th>
+                                    <th style={styles.th}>Decision without it</th>
+                                    <th style={styles.th}>Changed the outcome?</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {occlusionResult.occlusion_results.map(r => (
+                                    <tr key={r.omitted_field}>
+                                        <td style={styles.td}>{r.omitted_field}</td>
+                                        <td style={styles.td}>{r.decision_without_field}</td>
+                                        <td style={styles.td}>
+                                            {r.changed_from_baseline ? (
+                                                <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes - influential</span>
+                                            ) : (
+                                                <span style={{ color: '#999' }}>No</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                         </div>
@@ -1603,7 +1643,16 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
     const [editingApplied, setEditingApplied] = useState({})
     const [manuallyApplied, setManuallyApplied] = useState({})
 
+    const [activePhase, setActivePhase] = useState({})
+
     const allGreen = risks.every(r => r.treatmentStatus === 'confirmed')
+
+    function getActivePhase(riskId) {
+        return activePhase[riskId] || 1
+    }
+    function setPhase(riskId, phase) {
+        setActivePhase(prev => ({ ...prev, [riskId]: phase }))
+    }
 
     //Backendaufrufe
     async function runSimulation(id) {
@@ -1716,6 +1765,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
         }))
         if (field === 'treatmentOption' || field === 'treatmentNote') {
             setManuallyApplied(prev => ({ ...prev, [id]: false }))
+            setPhase(id, 1)
         }
     }
 
@@ -1779,8 +1829,11 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
             )}
 
             {/* Ampel Übersicht */}
-            <div style={{ ...styles.card, marginBottom: '24px', background: allGreen ? '#e8f5e9' : '#fff3e0', border: `1px solid ${allGreen ? '#2e7d32' : '#e65100'}` }}>
-                <p style={{ margin: 0, fontWeight: 'bold', color: allGreen ? '#2e7d32' : '#e65100' }}>
+            <div style={{
+                display: 'inline-block', padding: '8px 16px', borderRadius: '20px', marginBottom: '20px',
+                background: allGreen ? '#e8f5e9' : '#fff3e0', border: `1px solid ${allGreen ? '#2e7d32' : '#e65100'}`
+            }}>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', color: allGreen ? '#2e7d32' : '#e65100' }}>
                     {allGreen
                         ? '🟢 All risks treated - you may proceed to the Report.'
                         : `🟡 ${risks.filter(r => r.treatmentStatus !== 'confirmed').length} risk(s) still require treatment before you can proceed.`}
@@ -1837,10 +1890,14 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                         {showFullProcess && risk.treatmentStatus !== 'confirmed' && (
                             <>
                                 {/*Phase 1 - Treatment definieren*/}
-                                <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px', marginBottom: '14px' }}>
-                                    <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 'bold', color: '#1a1a2e' }}>
-                                        Phase 1 - Define Treatment Measure
-                                    </p>
+                                <CheckSection
+                                    number={1}
+                                    title="Define Treatment Measure"
+                                    done={risk.treatmentStatus === 'suggested'}
+                                    isActive={getActivePhase(risk.id) === 1}
+                                    onHeaderClick={() => risk.treatmentStatus === 'suggested' && setPhase(risk.id, 1)}
+                                    plain
+                                >
 
                                     {/*Auto-Suggestion bei den 3 Risiken*/}
                                     {TREATMENT_SUGGESTIONS[risk.id] && (
@@ -1943,7 +2000,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                             }}
                                                         >
                                                             {simulating === risk.id
-                                                                ? (risk.id === 10 ? 'Re-running test... (~1-3min)' : 'Running... (~3-5 min)')
+                                                                ? 'Running Test...'
                                                                 : simDone[risk.id]
                                                                     ? 'Completed'
                                                                     : `${TREATMENT_SUGGESTIONS[risk.id].simulationButton}`}
@@ -2013,26 +2070,44 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                     updateTreatment(risk.id, 'treatmentStatus', 'suggested')
                                                     setEditingApplied(prev => ({ ...prev, [risk.id]: false }))
                                                     setManuallyApplied(prev => ({ ...prev, [risk.id]: true }))
+                                                    setPhase(risk.id, 2)
                                                 }}
-                                                disabled={!risk.treatmentOption || !risk.treatmentNote || manuallyApplied[risk.id]}
+                                                disabled={!risk.treatmentOption || !risk.treatmentNote}
                                                 style={{
                                                     ...styles.button,
                                                     marginTop: '12px',
-                                                    background: manuallyApplied[risk.id] ? '#aaa' : (!risk.treatmentOption || !risk.treatmentNote) ? '#aaa' : '#1565c0',
-                                                    cursor: (!risk.treatmentOption || !risk.treatmentNote || manuallyApplied[risk.id]) ? 'not-allowed' : 'pointer',
-                                                    opacity: (!risk.treatmentOption || !risk.treatmentNote || manuallyApplied[risk.id]) ? 0.6 : 1,
+                                                    background: (!risk.treatmentOption || !risk.treatmentNote) ? '#aaa' : '#1565c0',
+                                                    cursor: (!risk.treatmentOption || !risk.treatmentNote) ? 'not-allowed' : 'pointer',
+                                                    opacity: (!risk.treatmentOption || !risk.treatmentNote) ? 0.6 : 1,
                                                 }}
                                             >
-                                                {manuallyApplied[risk.id] ? '✓ Applied' : 'Apply Treatment →'}
+                                                Continue to Residual Risk Assessment →
                                             </button>
                                         </>
                                     )}
-                                </div>
+
+                                    {risk.treatmentStatus === 'suggested' && TREATMENT_SUGGESTIONS[risk.id] && !manualOverride[risk.id] && !editingApplied[risk.id] && (
+                                        <button
+                                            onClick={() => setPhase(risk.id, 2)}
+                                            style={{ ...styles.button, marginTop: '16px' }}
+                                        >
+                                            Continue to Residual Risk Assessment →
+                                        </button>
+                                    )}
+                                </CheckSection>
 
                                 {/*Phase 2 - Residual Risk einschätzen*/}
-                                {risk.treatmentStatus === 'suggested' && (
-                                    <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px', marginBottom: '14px' }}>
-                                        <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 'bold', color: '#1a1a2e' }}>Phase 2 - Assess Residual Risk</p>
+                                <CheckSection
+                                    number={2}
+                                    title="Assess Residual Risk"
+                                    done={false}
+                                    isActive={risk.treatmentStatus === 'suggested' && getActivePhase(risk.id) === 2}
+                                    onHeaderClick={() => risk.treatmentStatus === 'suggested' && setPhase(risk.id, 2)}
+                                    plain
+                                >
+                                    {risk.treatmentStatus !== 'suggested' && (
+                                        <p style={{ fontSize: '13px', color: '#999' }}>Complete Phase 1 first.</p>
+                                    )}
                                         <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#666' }}>
                                             After applying this measure, how do you assess the remaining risk?
                                         </p>
@@ -2094,8 +2169,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                     The residual risk ({risk.residualLevel}) remains the same as initially assessed. This indicates that the risk has not decreased, but you can confirm this if you believe no further measurements will aid in its reduction.                                                </p>
                                             </div>
                                         )}
-                                    </div>
-                                )}
+                                    </CheckSection>
 
                                 {/*Confirm Button*/}
                                 {risk.treatmentStatus === 'suggested' && (
@@ -2125,7 +2199,10 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                         {' '}(was: <span style={{ color: levelColor(risk.level).text }}>{risk.level}</span>)
                                     </span>
                                     <button
-                                        onClick={() => setRisks(risks.map(r => r.id !== risk.id ? r : { ...r, treatmentStatus: 'none' }))}
+                                        onClick={() => {
+                                            setRisks(risks.map(r => r.id !== risk.id ? r : { ...r, treatmentStatus: 'none' }))
+                                            setPhase(risk.id, 1)
+                                        }}
                                         style={{ ...styles.buttonOutline, marginTop: 0, fontSize: '12px' }}
                                     >
                                         Edit
@@ -2282,38 +2359,92 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
             <h1 style={styles.heading}>Report</h1>
             <p style={styles.sub}>Risk Assessment Documentation - EU AI Act Art. 9 · Annex IV</p>
             <div style={styles.card}>
-                <h3 style={{ marginTop: 0 }}>Assessment Summary</h3>
-                <p><strong>Assessor:</strong> {user.assessorName} ({user.role})</p>
-                <p><strong>AI System:</strong> {user.aiSystemName}</p>
-                <p><strong>Date:</strong> {user.date}</p>
-                <p><strong>Domain:</strong> {scope.domain || '-'}</p>
-                <p><strong>Lifecycle Stage:</strong> {scope.phase || '-'}</p>
-                <p><strong>Likelihood Scale:</strong> NIST SP 800-30 Table G-3</p>
-                <p><strong>Impact Scale:</strong> NIST SP 800-30 Table H-3</p>
-                <p><strong>Risk Combination:</strong> NIST SP 800-30 Table I-2</p>
-                <p><strong>Total Risks Identified:</strong> {risks.length}</p>
-                <p><strong>High / Very High Risks:</strong> {high}</p>
-                <p><strong>Misuse Scenarios:</strong> {misuses.length}</p>
-                <p><strong>Status:</strong> {risks.length === 0 ? 'No assessment conducted' : 'Assessment complete'}</p>
-
-                <button
-                    onClick={handleDownload}
-                    disabled={downloading}
-                    style={{ ...styles.button, marginTop: '16px', opacity: downloading ? 0.7 : 1, cursor: downloading ? 'not-allowed' : 'pointer' }}
-                >
-                    {downloading ? 'Generating Report...' : 'Download Report (PDF)'}
-                </button>
-
-                {downloaded && (
-                    <div style={{ marginTop: '12px', padding: '12px 16px', background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px' }}>
-                        <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
-                            Report successfully generated and downloaded.
-                        </p>
-                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#555' }}>
-                            In a production environment, this report would be automatically transmitted to the Technical Documentation Microservice of the QMS.
-                        </p>
+                <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '17px' }}>Assessment Info</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+                    <div>
+                        <div style={{ fontSize: '13px', color: '#888' }}>Assessor</div>
+                        <div style={{ fontSize: '15px' }}>{user.assessorName} ({user.role})</div>
                     </div>
-                )}
+                    <div>
+                        <div style={{ fontSize: '13px', color: '#888' }}>AI System</div>
+                        <div style={{ fontSize: '15px' }}>{user.aiSystemName}</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '13px', color: '#888' }}>Date</div>
+                        <div style={{ fontSize: '15px' }}>{user.date}</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '13px', color: '#888' }}>Domain</div>
+                        <div style={{ fontSize: '15px' }}>{scope.domain || '-'}</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '13px', color: '#888' }}>Lifecycle Stage</div>
+                        <div style={{ fontSize: '15px' }}>{scope.phase || '-'}</div>
+                    </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #eee', paddingTop: '16px', marginBottom: '20px' }}>
+                    <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '17px' }}>Methodology</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                        <div>
+                            <div style={{ fontSize: '13px', color: '#888' }}>Likelihood Scale</div>
+                            <div style={{ fontSize: '15px' }}>NIST SP 800-30 Table G-3</div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '13px', color: '#888' }}>Impact Scale</div>
+                            <div style={{ fontSize: '15px' }}>NIST SP 800-30 Table H-3</div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '13px', color: '#888' }}>Risk Combination</div>
+                            <div style={{ fontSize: '15px' }}>NIST SP 800-30 Table I-2</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #eee', paddingTop: '16px', marginBottom: '20px' }}>
+                    <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '17px' }}>Results Summary</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+                        <div>
+                            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1a1a2e' }}>{risks.length}</div>
+                            <div style={{ fontSize: '13px', color: '#5a5a5a' }}>Total Risks Identified</div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '20px', fontWeight: 'bold', color: high > 0 ? '#c62828' : '#2e7d32' }}>{high}</div>
+                            <div style={{ fontSize: '13px', color: '#5a5a5a' }}>High / Very High Risks</div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1a1a2e' }}>{misuses.length}</div>
+                            <div style={{ fontSize: '13px', color: '#5a5a5a' }}>Misuse Scenarios</div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '14px', fontWeight: 'bold', color: risks.length === 0 ? '#e65100' : '#2e7d32', marginTop: '6px' }}>
+                                {risks.length === 0 ? 'No assessment conducted' : '✓ Assessment complete'}
+                            </div>
+                            <div style={{ fontSize: '13px', color: '#5a5a5a' }}>Status</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #eee', paddingTop: '16px' }}>
+                    <button
+                        onClick={handleDownload}
+                        disabled={downloading}
+                        style={{ ...styles.button, marginTop: 0, opacity: downloading ? 0.7 : 1, cursor: downloading ? 'not-allowed' : 'pointer' }}
+                    >
+                        {downloading ? 'Generating Report...' : 'Download Report (PDF)'}
+                    </button>
+
+                    {downloaded && (
+                        <div style={{ marginTop: '12px', padding: '12px 16px', background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px' }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
+                                Report successfully generated and downloaded.
+                            </p>
+                            <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#555' }}>
+                                In a production environment, this report would be automatically transmitted to the Technical Documentation Microservice of the QMS.
+                            </p>
+                        </div>
+                    )}
+                </div>
             </div>
             <NavButtons currentStep={6} onBack={onBack} onNext={finish} nextLabel="Finish" />
         </div>

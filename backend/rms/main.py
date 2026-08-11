@@ -505,7 +505,7 @@ def credit_metrics_extended(runs: int = 2):
 @app.get("/occlusion-aggregated")
 def occlusion_aggregated():
     field_influence_count = {field: 0 for field in ["age", "gender", "income", "employment", "existing_debt", "requested_amount"]}
-    tested_applicant_ids = [a["id"] for a in CREDIT_APPLICANTS[:3]]  #nur die ersten 3 statt aller 10 - reduziert Laufzeit
+    tested_applicant_ids = [a["id"] for a in CREDIT_APPLICANTS[:2]]  #nur die ersten 2 statt alle 10 - reduziert Laufzeit
 
     for applicant_id in tested_applicant_ids:
         result = occlusion_test(applicant_id)
