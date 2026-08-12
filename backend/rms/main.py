@@ -108,7 +108,7 @@ def build_custom_prompt(applicant: dict, task_description: str, positive_label: 
     )
 
 #Erzeugt mehrere bedeutungsgleiche, aber unterschiedlich formulierte Varianten eines Prompts (Perturbation-based Robustness, Mustroph & Rinderle-Ma 2024, nach Szegedy et al. 2014)
-def build_robustness_variants(applicant: dict, custom_prompt: str = None, positive_label: str = "approved", negative_label: str = "rejected"):
+def build_robustness_variants(applicant: dict, custom_prompt: str = None, positive_label: str = "approved", negative_label: str = "rejected", extended: bool = False):
     base_builder = (lambda a, omit=None: build_custom_prompt(a, custom_prompt, positive_label, negative_label, omit_field=omit)) \
         if custom_prompt else \
         (lambda a, omit=None: build_credit_prompt(a, omit_field=omit))
@@ -133,15 +133,32 @@ def build_robustness_variants(applicant: dict, custom_prompt: str = None, positi
     #Variante 3: identischer Prompt nochmal, aber mit einer Leerzeile mehr (rein syntaktische Störung)
     variant_whitespace = original_prompt.replace("\n\n", "\n\n\n", 1)
 
-    return {
+    variants = {
         "original": original_prompt,
         "reordered_fields": variant_reordered,
         "reformatted_numbers": variant_reformatted,
         "extra_whitespace": variant_whitespace,
     }
 
+    #Zusätzliche Varianten für den erweiterten Robustness-Test (Treatment-Simulation)
+    if extended:
+        #Variante 4: gesamten Prompt-Text (nur die Datenzeilen) in Großbuchstaben umwandeln
+        lines = original_prompt.split("\n")
+        variant_uppercase = "\n".join(
+            line.upper() if ":" in line and not line.strip().endswith((".", "?")) else line
+            for line in lines
+        )
+        variants["uppercase_labels"] = variant_uppercase
+
+        #Variante 5: Kombinierte Störung - alle drei ursprünglichen Perturbationen gleichzeitig
+        combined_applicant = {k: add_thousands_separator(v) for k, v in reversed_applicant.items()}
+        combined_prompt = base_builder(combined_applicant)
+        variants["combined_perturbation"] = combined_prompt.replace("\n\n", "\n\n\n", 1)
+
+    return variants
+
 #Generische Robustness-Logik: baseline + Varianten, misst Flip-Rate
-def run_robustness_test(applicant: dict, custom_prompt: str = None, positive_label: str = "approved", negative_label: str = "rejected"):
+def run_robustness_test(applicant: dict, custom_prompt: str = None, positive_label: str = "approved", negative_label: str = "rejected", extended: bool = False):
     def ask(prompt: str) -> str:
         try:
             response = requests.post(OLLAMA_URL, json={
@@ -155,7 +172,7 @@ def run_robustness_test(applicant: dict, custom_prompt: str = None, positive_lab
         except requests.exceptions.RequestException as e:
             raise HTTPException(status_code=502, detail=f"Could not reach Ollama: {str(e)}")
 
-    variants = build_robustness_variants(applicant, custom_prompt, positive_label, negative_label)
+    variants = build_robustness_variants(applicant, custom_prompt, positive_label, negative_label, extended=extended)
     baseline_decision = ask(variants["original"])
 
     variant_results = []
@@ -519,21 +536,20 @@ def credit_metrics_extended(runs: int = 2):
     }
 
 
-#Aggregierte Occlusion für Risiko 2 - über mehrere Antragsteller statt nur einem
-@app.get("/occlusion-aggregated")
-def occlusion_aggregated():
-    field_influence_count = {field: 0 for field in ["age", "gender", "income", "employment", "existing_debt", "requested_amount"]}
-    tested_applicant_ids = [a["id"] for a in CREDIT_APPLICANTS[:2]]  #nur die ersten 2 statt alle 10 - reduziert Laufzeit
-
-    for applicant_id in tested_applicant_ids:
-        result = occlusion_test(applicant_id)
+#Generische Occlusion-Aggregation-Logik, wiederverwendbar für Built-in und Upload
+def compute_occlusion_aggregated(applicants: list, custom_prompt: str = None, positive_label: str = "approved", negative_label: str = "rejected"):
+    field_influence_count = {}
+    for applicant in applicants:
+        result = run_occlusion(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
         for r in result["occlusion_results"]:
+            field = r["omitted_field"]
+            field_influence_count.setdefault(field, 0)
             if r["changed_from_baseline"]:
-                field_influence_count[r["omitted_field"]] += 1
+                field_influence_count[field] += 1
 
-    total_applicants = len(tested_applicant_ids)
+    total_applicants = len(applicants)
     field_influence_summary = [
-        {"field": field, "influential_count": count, "influential_rate": round(count / total_applicants, 2)}
+        {"field": field, "influential_count": count, "influential_rate": round(count / total_applicants, 2) if total_applicants > 0 else 0}
         for field, count in field_influence_count.items()
     ]
     field_influence_summary.sort(key=lambda x: x["influential_count"], reverse=True)
@@ -542,6 +558,25 @@ def occlusion_aggregated():
         "total_applicants_tested": total_applicants,
         "field_influence_summary": field_influence_summary,
     }
+
+
+@app.get("/occlusion-aggregated")
+def occlusion_aggregated():
+    tested_applicants = CREDIT_APPLICANTS[:2]
+    return compute_occlusion_aggregated(tested_applicants)
+
+
+#Generische Occlusion-Aggregation für Upload-Daten (mindestens 2 Zeilen erforderlich)
+@app.post("/occlusion-aggregated-custom")
+async def occlusion_aggregated_custom(payload: dict):
+    applicants = payload.get("applicants")
+    if not applicants or len(applicants) < 2:
+        raise HTTPException(status_code=400, detail="At least 2 applicants are required for aggregated occlusion testing.")
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
+    #Nur die ersten 2 Zeilen testen, um die Laufzeit vergleichbar zum Built-in-Fall zu halten
+    return compute_occlusion_aggregated(applicants[:2], custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
 
 ALL_OCCLUDABLE_FIELDS = ["age", "gender", "income", "employment", "existing_debt",
                          "requested_amount", "application_type", "loan_goal"]
@@ -636,6 +671,27 @@ def robustness_test(applicant_id: int):
     result = run_robustness_test(applicant)
     result["applicant_id"] = applicant_id
     return result
+
+#Erweiterter Robustness-Test (Treatment für Risiko 8) - testet 5 statt 3 Perturbationsvarianten
+@app.get("/robustness-test-extended/{applicant_id}")
+def robustness_test_extended(applicant_id: int):
+    applicant = next((a for a in CREDIT_APPLICANTS if a["id"] == applicant_id), None)
+    if not applicant:
+        raise HTTPException(status_code=404, detail="Applicant not found")
+    result = run_robustness_test(applicant, extended=True)
+    result["applicant_id"] = applicant_id
+    return result
+
+#Erweiterter Robustness-Test für Upload-Daten (Treatment für Risiko 8)
+@app.post("/robustness-test-extended-custom")
+async def robustness_test_extended_custom(payload: dict):
+    applicant = payload.get("applicant")
+    if not applicant:
+        raise HTTPException(status_code=400, detail="No applicant data provided.")
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
+    return run_robustness_test(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, extended=True)
 
 
 #Robustness-Test für einen vom Frontend übergebenen Antragsteller (z.B. aus einem Upload)

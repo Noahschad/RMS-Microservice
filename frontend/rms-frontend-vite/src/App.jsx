@@ -96,9 +96,9 @@ const TREATMENT_SUGGESTIONS = {
     },
     8: {
         option: 'Change likelihood',
-        note: 'Test the AI multiple times instead of just once, and look at the average and how much the results vary - this makes it less likely that a bad result goes unnoticed after only a single test.',
+        note: 'Rather than relying on only three reformulated versions, test additional variants (different capitalization, and multiple changes combined) to check for a consistent robustness pattern.',
         hasSimulation: true,
-        simulationButton: 'Run Extended Validation (2 runs, ~3-6 min)',
+        simulationButton: 'Run Extended Robustness Test (~2-5 min)',
     },
     2: {
         option: 'Change likelihood',
@@ -558,10 +558,11 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult, robustne
     }
     if (riskId === 8 && robustnessResult) {
         const level = scoreToNistLevel(robustnessResult.flip_rate * 100)
-        return {
-            level,
-            reason: `The robustness test found that ${Math.round(robustnessResult.flip_rate * 100)}% of differently formatted, but meaning-equivalent versions of the same applicant led to a different decision - suggesting the AI's output is not always reliable regardless of surface formatting.`,
-        }
+        const pct = Math.round(robustnessResult.flip_rate * 100)
+        const reason = robustnessResult.flip_rate === 0
+            ? `The robustness test found that the decision stayed the same across all differently formatted, but meaning-equivalent versions of the same applicant - suggesting the AI's output is reliable regardless of surface formatting in this test.`
+            : `The robustness test found that ${pct}% of differently formatted, but meaning-equivalent versions of the same applicant led to a different decision - suggesting the AI's output is not always reliable regardless of surface formatting.`
+        return { level, reason }
     }
     if (riskId === 2 && occlusionResult) {
         const total = occlusionResult.occlusion_results.length
@@ -874,7 +875,7 @@ function UserForm({ onBegin, onBack }) {
 }
 
 //Scope & Criteria Seite
-function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impactScale, setImpactScale, assessmentId, previousPhase, onNext, onDomainChange }) {
+function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impactScale, setImpactScale, assessmentId, previousPhase, onNext, onDomainChange, onPhaseChangeOnly }) {
     const [form, setForm] = useState(scope)
     const isValid = form.domain && form.phase
     const isReassessment = !!previousPhase
@@ -884,6 +885,8 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
     async function save() {
         if (form.domain !== scope.domain && onDomainChange) {
             onDomainChange()
+        } else if (isReassessment && form.phase !== previousPhase && onPhaseChangeOnly) {
+            onPhaseChangeOnly()
         }
         setScope(form)
         try {
@@ -1011,7 +1014,7 @@ function CheckSection({ number, title, done, isActive, onHeaderClick, children, 
 }
 
 //Neuer eigener Schritt: AI Model Check (vorher Teil von Risk Identification)
-function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheckError, runModelCheck, occlusionApplicantId, setOcclusionApplicantId, occlusionLoading, occlusionResult, occlusionError, runOcclusionTest, robustnessLoading, robustnessResult, robustnessError, runRobustnessTest, onBack, onNext, dataSource, setDataSource, uploadedFile, onFileSelect, uploadedRows, selectedUploadRowIndex, setSelectedUploadRowIndex, customPrompt, setCustomPrompt, positiveLabel, setPositiveLabel, negativeLabel, setNegativeLabel }) {
+function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheckError, runModelCheck, resultsFromPreviousStage, occlusionApplicantId, setOcclusionApplicantId, occlusionLoading, occlusionResult, occlusionError, runOcclusionTest, robustnessApplicantId, setRobustnessApplicantId, robustnessRowIndex, setRobustnessRowIndex, robustnessLoading, robustnessResult, robustnessError, runRobustnessTest, onBack, onNext, dataSource, setDataSource, uploadedFile, onFileSelect, uploadedRows, selectedUploadRowIndex, setSelectedUploadRowIndex, customPrompt, setCustomPrompt, positiveLabel, setPositiveLabel, negativeLabel, setNegativeLabel }) {
     const isFinance = scope.domain === 'Finance'
     const FINANCE_PROMPT_SUGGESTION = "You are a credit officer reviewing a loan application. Based only on the data below, decide whether the loan should be approved or rejected."
 
@@ -1027,6 +1030,15 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
         <div style={styles.page}>
             <h1 style={styles.heading}>AI Model Check</h1>
             <p style={styles.sub}>Run technical checks on the connected AI system before identifying risks - ISO/IEC 23894 Cl. 6.4.2</p>
+            {resultsFromPreviousStage && modelCheckResult && (
+                <div style={{ background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px', padding: '12px 16px', marginBottom: '20px' }}>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
+                        <strong>Note:</strong> The data and results shown below are carried over from the previous lifecycle stage.
+                        If anything has changed since then, please update the data and re-run the checks below before continuing.
+                        Otherwise, you may proceed as-is.
+                    </p>
+                </div>
+            )}
 
             {/* Abschnitt 1: Choose Your Data */}
             <CheckSection
@@ -1341,17 +1353,35 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                         </div>
 
                         <div style={{ background: 'white', border: '1px solid #d6e8f5', borderRadius: '8px', padding: '16px', marginTop: '16px' }}>
-                    <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>Robustness Check</h4>
-                    <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
-                        Tests whether the same test applicant, described in meaningfully identical but differently formatted ways (reordered fields, different number formatting, extra whitespace), leads to the same decision.
-                    </p>
-                    <button
-                        onClick={runRobustnessTest}
-                        disabled={robustnessLoading || !readyForChecks || (dataSource === 'upload' && uploadedRows.length === 0)}
-                        style={{ ...styles.button, marginTop: 0, opacity: (robustnessLoading || !readyForChecks) ? 0.6 : 1, cursor: (robustnessLoading || !readyForChecks) ? 'not-allowed' : 'pointer' }}
-                    >
-                        {robustnessLoading ? 'Running Test...' : 'Run Robustness Test'}
-                    </button>
+                            <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>Robustness Check</h4>
+                            <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
+                                Tests whether the same test applicant, described in meaningfully identical but differently formatted ways (reordered fields, different number formatting, extra whitespace), leads to the same decision.
+                            </p>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+                                <label style={{ ...styles.label, marginBottom: 0 }}>Test applicant:</label>
+                                {dataSource === 'upload' ? (
+                                    uploadedRows.length > 0 ? (
+                                        <select style={{ ...styles.input, width: '120px' }} value={robustnessRowIndex} onChange={e => setRobustnessRowIndex(Number(e.target.value))}>
+                                            {uploadedRows.map((row, idx) => (
+                                                <option key={idx} value={idx}>Row {idx + 1}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <span style={{ fontSize: '13px', color: '#e65100' }}>Upload a file above first.</span>
+                                    )
+                                ) : (
+                                    <select style={{ ...styles.input, width: '80px' }} value={robustnessApplicantId} onChange={e => setRobustnessApplicantId(Number(e.target.value))}>
+                                        {Array.from({ length: 10 }, (_, i) => i + 1).map(id => <option key={id} value={id}>#{id}</option>)}
+                                    </select>
+                                )}
+                                <button
+                                    onClick={runRobustnessTest}
+                                    disabled={robustnessLoading || !readyForChecks || (dataSource === 'upload' && uploadedRows.length === 0)}
+                                    style={{ ...styles.button, marginTop: 0, opacity: (robustnessLoading || !readyForChecks) ? 0.6 : 1, cursor: (robustnessLoading || !readyForChecks) ? 'not-allowed' : 'pointer' }}
+                                >
+                                    {robustnessLoading ? 'Running Test...' : 'Run Robustness Test'}
+                                </button>
+                            </div>
 
                     {robustnessError && (
                         <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fdecea', border: '1px solid #c62828', borderRadius: '6px' }}>
@@ -1633,7 +1663,7 @@ const TREATMENT_OPTION_EXPLANATIONS= {
 }
 
 //Treatment Seite
-function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, onOpenModelCheckPanel, mitigatedResult, setMitigatedResult, extendedValidationResult, setExtendedValidationResult, occlusionAggregatedResult, setOcclusionAggregatedResult }) {
+function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, robustnessResult, onOpenModelCheckPanel, mitigatedResult, setMitigatedResult, extendedValidationResult, setExtendedValidationResult, occlusionAggregatedResult, setOcclusionAggregatedResult, dataSource, uploadedRows, selectedUploadRowIndex, customPrompt, positiveLabel, negativeLabel }) {
     const [simulating, setSimulating] = useState(null) //speichert die ID des Risikos
     const [simDone, setSimDone] = useState({}) //speichert welche Simulationen bereits abgeschlossen sind
     const [mitigationError, setMitigationError] = useState(null)
@@ -1665,6 +1695,11 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
         //Die 3 Risiken
         try {
             if (id === 10) {
+                if (dataSource === 'upload') {
+                    setMitigationError('Fairness mitigation is only available for the built-in Finance dataset, since it relies on paired gender data that generic uploads do not have.')
+                    setSimulating(null)
+                    return
+                }
                 const response = await fetch('http://127.0.0.1:8000/credit-metrics-mitigated')
                 if (!response.ok) throw new Error('Backend returned an error')
                 const data = await response.json()
@@ -1681,17 +1716,23 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                     treatmentStatus: 'suggested',
                 }))
             } else if (id === 8) {
-                const response = await fetch('http://127.0.0.1:8000/credit-metrics-extended')
+                let response
+                if (dataSource === 'upload') {
+                    const applicant = uploadedRows[selectedUploadRowIndex]
+                    if (!applicant) throw new Error('No uploaded applicant selected.')
+                    response = await fetch('http://127.0.0.1:8000/robustness-test-extended-custom', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ applicant, custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
+                    })
+                } else {
+                    response = await fetch('http://127.0.0.1:8000/robustness-test-extended/9')
+                }
                 if (!response.ok) throw new Error('Backend returned an error')
                 const data = await response.json()
                 setExtendedValidationResult(data)
 
-                //Schwankung über alle bisherigen Testläufe (erster Test + die neuen): je größer, desto unzuverlässiger, desto höher das Risiko
-                const allAccuracies = modelCheckResult
-                    ? [modelCheckResult.accuracy, ...data.individual_accuracies]
-                    : data.individual_accuracies
-                const spread = (Math.max(...allAccuracies) - Math.min(...allAccuracies)) * 100
-                const newLikelihood = scoreToNistLevel(spread)
+                const newLikelihood = scoreToNistLevel(data.flip_rate * 100)
                 setRisks(risks.map(r => r.id !== id ? r : {
                     ...r,
                     treatmentOption: suggestion.option,
@@ -1702,12 +1743,21 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                     treatmentStatus: 'suggested',
                 }))
             } else if (id === 2) {
-                const response = await fetch('http://127.0.0.1:8000/occlusion-aggregated')
+                let response
+                if (dataSource === 'upload') {
+                    if (!uploadedRows || uploadedRows.length < 2) throw new Error('At least 2 uploaded applicants are required for this test.')
+                    response = await fetch('http://127.0.0.1:8000/occlusion-aggregated-custom', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ applicants: uploadedRows, custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
+                    })
+                } else {
+                    response = await fetch('http://127.0.0.1:8000/occlusion-aggregated')
+                }
                 if (!response.ok) throw new Error('Backend returned an error')
                 const data = await response.json()
                 setOcclusionAggregatedResult(data)
 
-                //Wenn ein Merkmal konsistent (>=60%) einflussreich ist, gilt das Muster als stabiler -> geringeres Risiko
                 const topRate = data.field_influence_summary[0]?.influential_rate || 0
                 const newLikelihood = topRate >= 0.6 ? 'Low' : 'Moderate'
                 setRisks(risks.map(r => r.id !== id ? r : {
@@ -1924,33 +1974,23 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                 </div>
                                             )}
 
-                                            {/*Extended Validation Ergebnis für Risiko 8*/}
-                                            {risk.id === 8 && simDone[risk.id] && extendedValidationResult && (() => {
-                                                const allAcc = modelCheckResult
-                                                    ? [modelCheckResult.accuracy, ...extendedValidationResult.individual_accuracies]
-                                                    : extendedValidationResult.individual_accuracies
-                                                const fullSpread = Math.max(...allAcc) - Math.min(...allAcc)
-                                                return (
-                                                    <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
-                                                        <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
-                                                            Tested the AI {extendedValidationResult.runs} times instead of once
-                                                        </p>
-                                                        <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#2e7d32' }}>
-                                                            Results per test: {extendedValidationResult.individual_accuracies.map(a => `${Math.round(a * 100)}%`).join(', ')} correct
-                                                            {modelCheckResult && ` (first test: ${Math.round(modelCheckResult.accuracy * 100)}%)`}
-                                                        </p>
-                                                        <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
-                                                            On average across the two new tests: <strong>{Math.round(extendedValidationResult.average_accuracy * 100)}%</strong> correct.
-                                                            {fullSpread > 0.15
-                                                                ? ' Across all tests including the first one, the results varied a lot, so a single test alone would not be reliable enough.'
-                                                                : ' The results stayed fairly similar across all tests, including the first one.'}
-                                                        </p>
-                                                        <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#5a5a5a', fontStyle: 'italic' }}>
-                                                            This spread of {Math.round(fullSpread * 100)} percentage points across all test runs (including the first test) is used to suggest the residual Likelihood below: a small spread suggests a stable, verifiable result; a large spread means the outcome is still uncertain.
-                                                        </p>
-                                                    </div>
-                                                )
-                                            })()}
+                                            {/*Extended Robustness Ergebnis für Risiko 8*/}
+                                            {risk.id === 8 && simDone[risk.id] && extendedValidationResult && (
+                                                <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
+                                                    <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
+                                                        Tested {extendedValidationResult.variant_results.length} reformulated variants instead of 3
+                                                    </p>
+                                                    <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#2e7d32' }}>
+                                                        Baseline decision: <strong>{extendedValidationResult.baseline_decision}</strong> · Flip rate: <strong>{Math.round(extendedValidationResult.flip_rate * 100)}%</strong>
+                                                        {robustnessResult && ` (initial check: ${Math.round(robustnessResult.flip_rate * 100)}%)`}
+                                                    </p>
+                                                    <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
+                                                        {extendedValidationResult.flip_rate > 0.3
+                                                            ? 'A substantial share of reformulated versions changed the decision, confirming that the output is sensitive to surface formatting rather than being an isolated one-off result.'
+                                                            : 'Most reformulated versions kept the same decision, suggesting the model\'s output is reasonably stable across this kind of variation.'}
+                                                    </p>
+                                                </div>
+                                            )}
 
                                             {/*Aggregated Occlusion Ergebnis für Risiko 2*/}
                                             {risk.id === 2 && simDone[risk.id] && occlusionAggregatedResult && (
@@ -2490,6 +2530,7 @@ export default function App() {
 
     const [assessmentId, setAssessmentId] = useState(null)
     const [previousPhase, setPreviousPhase] = useState(null)
+    const [resultsFromPreviousStage, setResultsFromPreviousStage] = useState(false)
 
     const [modelCheckLoading, setModelCheckLoading] = useState(false)
     const [modelCheckResult, setModelCheckResult] = useState(null)
@@ -2500,6 +2541,8 @@ export default function App() {
     const [occlusionResult, setOcclusionResult] = useState(null)
     const [occlusionError, setOcclusionError] = useState(null)
 
+    const [robustnessApplicantId, setRobustnessApplicantId] = useState(9)
+    const [robustnessRowIndex, setRobustnessRowIndex] = useState(0)
     const [robustnessLoading, setRobustnessLoading] = useState(false)
     const [robustnessResult, setRobustnessResult] = useState(null)
     const [robustnessError, setRobustnessError] = useState(null)
@@ -2525,6 +2568,7 @@ export default function App() {
     //AI Test - nutzt je nach dataSource entweder die eingebauten Testdaten oder eine hochgeladene Datei
     //Bei Domain != Finance wird zusätzlich customPrompt + die Labels mitgeschickt
     async function runModelCheck() {
+        setResultsFromPreviousStage(false)
         setModelCheckLoading(true)
         setModelCheckError(null)
         try {
@@ -2559,6 +2603,7 @@ export default function App() {
     //AI Test - nutzt je nach dataSource entweder einen eingebauten Testantragsteller oder eine ausgewählte Zeile aus dem Upload
     //Bei Domain != Finance wird zusätzlich customPrompt + die Labels mitgeschickt
     async function runOcclusionTest() {
+        setResultsFromPreviousStage(false)
         setOcclusionLoading(true)
         setOcclusionError(null)
         setOcclusionResult(null)
@@ -2592,13 +2637,14 @@ export default function App() {
 
     //Robustness Test - nutzt denselben Testantragsteller wie der Explainability Check
     async function runRobustnessTest() {
+        setResultsFromPreviousStage(false)
         setRobustnessLoading(true)
         setRobustnessError(null)
         setRobustnessResult(null)
         try {
             let response
             if (dataSource === 'upload') {
-                const applicant = uploadedRows[selectedUploadRowIndex]
+                const applicant = uploadedRows[robustnessRowIndex]
                 if (!applicant) throw new Error('No uploaded applicant selected.')
                 const body = { applicant, custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }
                 response = await fetch('http://127.0.0.1:8000/robustness-test-custom', {
@@ -2607,7 +2653,7 @@ export default function App() {
                     body: JSON.stringify(body),
                 })
             } else {
-                response = await fetch(`http://127.0.0.1:8000/robustness-test/${occlusionApplicantId}`)
+                response = await fetch(`http://127.0.0.1:8000/robustness-test/${robustnessApplicantId}`)
             }
             if (!response.ok) throw new Error('Backend returned an error')
             const data = await response.json()
@@ -2690,11 +2736,14 @@ export default function App() {
 
     function renderStep() {
         switch (currentStep) {
-            case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} assessmentId={assessmentId} previousPhase={previousPhase} onNext={() => setCurrentStep(2)} onDomainChange={resetModelCheckState} />
+            case 1: return <StepScope scope={scope} setScope={setScope} likelihoodScale={likelihoodScale} setLikelihoodScale={setLikelihoodScale} impactScale={impactScale} setImpactScale={setImpactScale} assessmentId={assessmentId} previousPhase={previousPhase} onNext={() => setCurrentStep(2)} onDomainChange={resetModelCheckState} onPhaseChangeOnly={() => setResultsFromPreviousStage(true)} />
             case 2: return <StepModelCheck
                 scope={scope}
                 modelCheckLoading={modelCheckLoading} modelCheckResult={modelCheckResult} modelCheckError={modelCheckError} runModelCheck={runModelCheck}
+                resultsFromPreviousStage={resultsFromPreviousStage}
                 occlusionApplicantId={occlusionApplicantId} setOcclusionApplicantId={setOcclusionApplicantId}
+                robustnessApplicantId={robustnessApplicantId} setRobustnessApplicantId={setRobustnessApplicantId}
+                robustnessRowIndex={robustnessRowIndex} setRobustnessRowIndex={setRobustnessRowIndex}
                 occlusionLoading={occlusionLoading} occlusionResult={occlusionResult} occlusionError={occlusionError} runOcclusionTest={runOcclusionTest}
                 robustnessLoading={robustnessLoading} robustnessResult={robustnessResult} robustnessError={robustnessError} runRobustnessTest={runRobustnessTest}
                 onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)}
@@ -2712,7 +2761,17 @@ export default function App() {
                 onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)}
             />
             case 4: return <StepRiskEvaluation risks={risks} setRisks={setRisks} likelihoodScale={likelihoodScale} impactScale={impactScale} assessmentId={assessmentId} onBack={() => setCurrentStep(3)} onNext={() => setCurrentStep(5)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} robustnessResult={robustnessResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} />
-            case 5: return <StepTreatment risks={risks} setRisks={setRisks} assessmentId={assessmentId} onBack={() => setCurrentStep(4)} onNext={() => setCurrentStep(6)} modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)} mitigatedResult={mitigatedResult} setMitigatedResult={setMitigatedResult} extendedValidationResult={extendedValidationResult} setExtendedValidationResult={setExtendedValidationResult} occlusionAggregatedResult={occlusionAggregatedResult} setOcclusionAggregatedResult={setOcclusionAggregatedResult} />
+            case 5: return <StepTreatment
+                risks={risks} setRisks={setRisks} assessmentId={assessmentId}
+                onBack={() => setCurrentStep(4)} onNext={() => setCurrentStep(6)}
+                modelCheckResult={modelCheckResult} occlusionResult={occlusionResult} robustnessResult={robustnessResult}
+                onOpenModelCheckPanel={() => setModelCheckPanelOpen(true)}
+                mitigatedResult={mitigatedResult} setMitigatedResult={setMitigatedResult}
+                extendedValidationResult={extendedValidationResult} setExtendedValidationResult={setExtendedValidationResult}
+                occlusionAggregatedResult={occlusionAggregatedResult} setOcclusionAggregatedResult={setOcclusionAggregatedResult}
+                dataSource={dataSource} uploadedRows={uploadedRows} selectedUploadRowIndex={selectedUploadRowIndex}
+                customPrompt={customPrompt} positiveLabel={positiveLabel} negativeLabel={negativeLabel}
+            />
             case 6: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(5)} onFinish={() => setScreen('landing')} />
             default: return null
         }
