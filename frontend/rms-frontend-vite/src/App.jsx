@@ -589,7 +589,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                 </div>
                 <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>   {/*4 Bedingungen - genau eine ist wahr*/}
                     {activeView === 'mitigated' && 'Tested again without showing the AI the applicant\'s gender.'}
-                    {activeView === 'extended' && 'Tested the AI several times instead of once.'}
+                    {activeView === 'extended' && 'Tested additional reformulated variants for robustness.'}
                     {activeView === 'occlusionAgg' && 'Checked several applicants instead of just one.'}
                     {activeView === 'robustness' && 'Tested whether differently formatted, but meaning-equivalent inputs change the decision.'}
                     {activeView === 'original' && 'The first test result, from the Risk Identification step.'}
@@ -627,7 +627,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                                 color: activeView === 'extended' ? 'white' : '#1a1a2e',
                             }}
                         >
-                            Multiple Tests
+                            Extended Robustness
                         </button>
                     )}
                     {occlusionAggregatedResult && ( //nur wenn occlusionAggregatedResult nicht null ist
@@ -743,19 +743,32 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                 {/*Extenden Validation Ansicht*/}
                 {activeView === 'extended' && extendedValidationResult && (
                     <div>
-                        <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Testing the AI multiple times</h3>
+                        <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Extended Robustness Check</h3>
                         <p style={{ fontSize: '13px', marginBottom: '10px' }}>
-                            Results per test: {extendedValidationResult.individual_accuracies.map(a => `${Math.round(a * 100)}%`).join(', ')}
+                            Baseline decision: <strong>{extendedValidationResult.baseline_decision}</strong> · Flip rate: <strong>{Math.round(extendedValidationResult.flip_rate * 100)}%</strong> (across {extendedValidationResult.variant_results.length} variants)
                         </p>
-                        <p style={{ fontSize: '13px', marginBottom: '10px' }}>
-                            Average: <strong>{Math.round(extendedValidationResult.average_accuracy * 100)}%</strong> correct
-                            (between {Math.round(extendedValidationResult.accuracy_range[0] * 100)}% and {Math.round(extendedValidationResult.accuracy_range[1] * 100)}%)
-                        </p>
-                        <p style={{ fontSize: '13px', color: '#5a5a5a' }}>
-                            {(extendedValidationResult.accuracy_range[1] - extendedValidationResult.accuracy_range[0]) > 0.15
-                                ? 'The results changed quite a bit between tests - a single test alone would not be reliable enough.'
-                                : 'The results stayed fairly similar every time.'}
-                        </p>
+                        <table style={styles.table}>
+                            <thead>
+                            <tr>
+                                <th style={styles.th}>Variant</th>
+                                <th style={styles.th}>Decision</th>
+                                <th style={styles.th}>Changed?</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {extendedValidationResult.variant_results.map(r => (
+                                <tr key={r.variant}>
+                                    <td style={styles.td}>{r.variant.replace(/_/g, ' ')}</td>
+                                    <td style={styles.td}>{r.decision}</td>
+                                    <td style={styles.td}>
+                                        {r.changed_from_baseline
+                                            ? <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes</span>
+                                            : <span style={{ color: '#999' }}>No</span>}
+                                    </td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
                 {/*Occlusion Aggregated Ansicht*/}
@@ -1063,7 +1076,14 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
 
                 <div style={{ display: 'flex', gap: '10px', marginBottom: dataSource === 'upload' ? '16px' : 0 }}>
                     <button
-                        onClick={() => isFinance && setDataSource('builtin')}
+                        onClick={() => {
+                            if (isFinance) {
+                                setDataSource('builtin')
+                                setCustomPrompt(FINANCE_PROMPT_SUGGESTION)
+                                setPositiveLabel('approved')
+                                setNegativeLabel('rejected')
+                            }
+                        }}
                         disabled={!isFinance}
                         style={{
                             ...styles.buttonOutline, marginTop: 0,
@@ -1074,7 +1094,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                             opacity: isFinance ? 1 : 0.6,
                         }}
                     >
-                        Use built-in test data (10 sample applicants) {!isFinance && '- Finance only'}
+                        Use built-in test data (8 sample applicants) {!isFinance && '- Finance only'}
                     </button>
                     <button
                         onClick={() => setDataSource('upload')}
@@ -1134,9 +1154,31 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                 onHeaderClick={() => section1Done && setActiveSection(2)}
             >
                 {dataSource === 'builtin' ? (
-                    <p style={{ fontSize: '13px', color: '#666' }}>
-                        Not needed for built-in data - the task is already fixed to credit scoring.
-                    </p>
+                    <>
+                        <div style={{ background: '#e3f2fd', border: '1px solid #90caf9', borderRadius: '6px', padding: '10px 14px', marginBottom: '14px' }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#1565c0' }}>
+                                This is the prompt and label pair used for the built-in Finance dataset. You can review it below, or adjust it if you want to test a different framing.
+                            </p>
+                        </div>
+
+                        <label style={styles.label}>Task description used for this test</label>
+                        <textarea
+                            style={{ ...styles.input, height: '80px', resize: 'vertical', marginBottom: '12px' }}
+                            value={customPrompt}
+                            onChange={e => setCustomPrompt(e.target.value)}
+                        />
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ flex: 1 }}>
+                                <label style={styles.label}>Positive outcome label</label>
+                                <input style={styles.input} value={positiveLabel} onChange={e => setPositiveLabel(e.target.value)} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <label style={styles.label}>Negative outcome label</label>
+                                <input style={styles.input} value={negativeLabel} onChange={e => setNegativeLabel(e.target.value)} />
+                            </div>
+                        </div>
+                    </>
                 ) : (
                     <>
                         {isFinance && (
@@ -1700,7 +1742,11 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                     setSimulating(null)
                     return
                 }
-                const response = await fetch('http://127.0.0.1:8000/credit-metrics-mitigated')
+                const response = await fetch('http://127.0.0.1:8000/credit-metrics-mitigated', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
+                })
                 if (!response.ok) throw new Error('Backend returned an error')
                 const data = await response.json()
                 setMitigatedResult(data)
@@ -1726,7 +1772,11 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                         body: JSON.stringify({ applicant, custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
                     })
                 } else {
-                    response = await fetch('http://127.0.0.1:8000/robustness-test-extended/8')
+                    response = await fetch('http://127.0.0.1:8000/robustness-test-extended/8', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
+                    })
                 }
                 if (!response.ok) throw new Error('Backend returned an error')
                 const data = await response.json()
@@ -1752,7 +1802,11 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                         body: JSON.stringify({ applicants: uploadedRows, custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
                     })
                 } else {
-                    response = await fetch('http://127.0.0.1:8000/occlusion-aggregated')
+                    response = await fetch('http://127.0.0.1:8000/occlusion-aggregated', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
+                    })
                 }
                 if (!response.ok) throw new Error('Backend returned an error')
                 const data = await response.json()
@@ -2585,7 +2639,11 @@ export default function App() {
                     body: formData,
                 })
             } else {
-                response = await fetch('http://127.0.0.1:8000/credit-metrics')
+                response = await fetch('http://127.0.0.1:8000/credit-metrics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
+                })
             }
             if (!response.ok) {
                 const errData = await response.json().catch(() => null)
@@ -2623,7 +2681,11 @@ export default function App() {
                     body: JSON.stringify(body),
                 })
             } else {
-                response = await fetch(`http://127.0.0.1:8000/occlusion-test/${occlusionApplicantId}`)
+                response = await fetch(`http://127.0.0.1:8000/occlusion-test/${occlusionApplicantId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
+                })
             }
             if (!response.ok) throw new Error('Backend returned an error')
             const data = await response.json()
@@ -2653,7 +2715,11 @@ export default function App() {
                     body: JSON.stringify(body),
                 })
             } else {
-                response = await fetch(`http://127.0.0.1:8000/robustness-test/${robustnessApplicantId}`)
+                response = await fetch(`http://127.0.0.1:8000/robustness-test/${robustnessApplicantId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
+                })
             }
             if (!response.ok) throw new Error('Backend returned an error')
             const data = await response.json()

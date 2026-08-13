@@ -86,10 +86,10 @@ def build_credit_prompt(applicant: dict, omit_field: str = None) -> str:
 #Baut einen Prompt aus einem freien, vom User definierten Aufgabentext + Beliebigen Spalten aus der CSV
 #(anders als build_credit_prompt: kennt keine festen Feldnamen, nutzt einfach alle Spalten außer ground_truth)
 def build_custom_prompt(applicant: dict, task_description: str, positive_label: str, negative_label: str, omit_field: str = None) -> str:
-    #Alle Spalten außer ground_truth werden als Datenzeilen verwendet
+    #Alle Spalten außer ground_truth und id werden als Datenzeilen verwendet - "id" ist ein interner Identifikator, keine echte Antragsteller-Eigenschaft, und darf dem Modell nicht als Datenfeld präsentiert werden
     usable_items = [
         (key, value) for key, value in applicant.items()
-        if key != "ground_truth"
+        if key not in ("ground_truth", "id")
            and key != omit_field
            and str(value).strip().lower() not in ("n/a", "", "none")
     ]
@@ -211,6 +211,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+#Einmaliger Aufwärm-Call beim Start des Backends: der erste Ollama-Request nach Inaktivität kann von
+#nachfolgenden identischen Requests abweichen (Modell-Ladeverhalten/GPU-Kontext-Initialisierung bei Ollama),
+#unabhängig von temperature=0/seed=42. Ein verworfener Aufwärm-Call vor dem ersten echten Request vermeidet dies.
+@app.on_event("startup")
+def warm_up_model():
+    try:
+        requests.post(OLLAMA_URL, json={
+            "model": OLLAMA_MODEL,
+            "prompt": "Hello",
+            "stream": False,
+            "options": {"temperature": 0, "seed": 42}
+        }, timeout=60)
+        print(f"[startup] Warmed up {OLLAMA_MODEL}")
+    except requests.exceptions.RequestException as e:
+        print(f"[startup] Warm-up failed (Ollama may not be running yet): {e}")
+
 
 #Pydantic validiert automatisch eingehende Daten --> Welche Datenformen erwartet das Backend
 class AISystemInfo(BaseModel):
@@ -315,11 +331,16 @@ def credit_test(applicant_id: int):
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=502, detail=f"Could not reach Ollama: {str(e)}")
 
-#Kernlogik als eigene Funktion, damit sie mit und ohne "omit_field" wiederverwendbar ist --> Rechnungen
-def compute_credit_metrics(omit_field: str = None):
+#custom_prompt optional: wenn gesetzt, wird der Nutzer-Prompt statt des festen Finance-Prompts verwendet
+#Counterfactual Fairness wird bei Built-in-Daten IMMER berechnet, da gender/Paar-Struktur strukturell garantiert ist,
+#unabhängig davon ob der Prompt-Text geändert wurde
+def compute_credit_metrics(omit_field: str = None, custom_prompt: str = None, positive_label: str = "approved", negative_label: str = "rejected"):
     results = []
     for applicant in CREDIT_APPLICANTS:
-        prompt = build_credit_prompt(applicant, omit_field=omit_field)
+        if custom_prompt:
+            prompt = build_custom_prompt(applicant, custom_prompt, positive_label, negative_label, omit_field=omit_field)
+        else:
+            prompt = build_credit_prompt(applicant, omit_field=omit_field)
         try:
             response = requests.post(OLLAMA_URL, json={
                 "model": OLLAMA_MODEL,
@@ -332,7 +353,7 @@ def compute_credit_metrics(omit_field: str = None):
             })
             response.raise_for_status()
             data = response.json()
-            decision = extract_decision(data["response"])
+            decision = extract_decision(data["response"], positive_label, negative_label)
         except requests.exceptions.RequestException as e:
             raise HTTPException(status_code=502, detail=f"Could not reach Ollama: {str(e)}")
 
@@ -344,27 +365,24 @@ def compute_credit_metrics(omit_field: str = None):
             "correct": decision == applicant["ground_truth"],
         })
 
-    #Accuracy = Anteil korrekter Entscheidungen
     correct_count = sum(1 for r in results if r["correct"])
     accuracy = correct_count / len(results)
 
-    #Counterfactual Fairness = Anteil Paare, bei denen sich Entscheidungen durch Geschlecht ändern
     flipped_pairs = 0
     total_pairs = len(results) // 2
     for i in range(0, len(results), 2):
-        pair = results[i:i + 2] #Zwei auffeinanderfolgende Einträge bilden Paar
+        pair = results[i:i + 2]
         if len(pair) == 2 and pair[0]["model_decision"] != pair[1]["model_decision"]:
             flipped_pairs += 1
-    counterfactual_fairness = flipped_pairs / total_pairs
+    counterfactual_fairness = flipped_pairs / total_pairs if total_pairs > 0 else 0
 
-    #Precision, Recall, Specificity, F1-Score
     clear_results = [r for r in results if r["model_decision"] != "unclear"]
     unclear_count = len(results) - len(clear_results)
 
-    tp = sum(1 for r in clear_results if r["model_decision"] == "approved" and r["ground_truth"] == "approved")
-    fp = sum(1 for r in clear_results if r["model_decision"] == "approved" and r["ground_truth"] == "rejected")
-    fn = sum(1 for r in clear_results if r["model_decision"] == "rejected" and r["ground_truth"] == "approved")
-    tn = sum(1 for r in clear_results if r["model_decision"] == "rejected" and r["ground_truth"] == "rejected")
+    tp = sum(1 for r in clear_results if r["model_decision"] == positive_label and r["ground_truth"] == positive_label)
+    fp = sum(1 for r in clear_results if r["model_decision"] == positive_label and r["ground_truth"] == negative_label)
+    fn = sum(1 for r in clear_results if r["model_decision"] == negative_label and r["ground_truth"] == positive_label)
+    tn = sum(1 for r in clear_results if r["model_decision"] == negative_label and r["ground_truth"] == negative_label)
 
     precision = tp / (tp + fp) if (tp + fp) > 0 else None
     recall = tp / (tp + fn) if (tp + fn) > 0 else None
@@ -502,21 +520,33 @@ async def upload_applicants(
     return metrics
 
 #Testet alle Antragssteller + Berechnungen
-@app.get("/credit-metrics")
-def credit_metrics():
-    return compute_credit_metrics()
+@app.post("/credit-metrics")
+async def credit_metrics(payload: dict = None):
+    payload = payload or {}
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
+    return compute_credit_metrics(custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
 
 
 #Wiederholt denselben Test, aber ohne "gender" im Prompt
 #(IEEE Std 3198-2025, Cl. 6.2.1.9), simuliert eine Bias-Mitigation-Maßnahme
-@app.get("/credit-metrics-mitigated")
-def credit_metrics_mitigated():
-    return compute_credit_metrics(omit_field="gender")
+@app.post("/credit-metrics-mitigated")
+async def credit_metrics_mitigated(payload: dict = None):
+    payload = payload or {}
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
+    return compute_credit_metrics(omit_field="gender", custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
 
 #Extended Validation für Risiko 8 - mehrere unabhängige Durchläufe statt einem einzelnen
-@app.get("/credit-metrics-extended")
-def credit_metrics_extended(runs: int = 2):
-    all_results = [compute_credit_metrics() for _ in range(runs)]
+@app.post("/credit-metrics-extended")
+async def credit_metrics_extended(payload: dict = None, runs: int = 2):
+    payload = payload or {}
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
+    all_results = [compute_credit_metrics(custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label) for _ in range(runs)]
     accuracies = [r["accuracy"] for r in all_results]
     cf_values = [r["counterfactual_fairness"] for r in all_results]
 
@@ -560,10 +590,14 @@ def compute_occlusion_aggregated(applicants: list, custom_prompt: str = None, po
     }
 
 
-@app.get("/occlusion-aggregated")
-def occlusion_aggregated():
+@app.post("/occlusion-aggregated")
+async def occlusion_aggregated(payload: dict = None):
+    payload = payload or {}
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
     tested_applicants = CREDIT_APPLICANTS[:2]
-    return compute_occlusion_aggregated(tested_applicants)
+    return compute_occlusion_aggregated(tested_applicants, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
 
 
 #Generische Occlusion-Aggregation für Upload-Daten (mindestens 2 Zeilen erforderlich)
@@ -608,10 +642,10 @@ def run_occlusion(applicant: dict, custom_prompt: str = None, positive_label: st
     baseline_decision = ask(make_prompt())
 
     if custom_prompt:
-        #Freier Modus: alle Spalten außer ground_truth sind occludable
+        #Freier Modus: alle Spalten außer ground_truth und id sind occludable
         occludable_fields = [
-            k for k in applicant.keys()
-            if k != "ground_truth" and str(applicant.get(k, "n/a")).strip().lower() not in ("n/a", "", "none")
+        k for k in applicant.keys()
+        if k not in ("ground_truth", "id") and str(applicant.get(k, "n/a")).strip().lower() not in ("n/a", "", "none")
         ]
     else:
         #Fester Finance-Modus: nur die bekannte Feldliste
@@ -636,13 +670,17 @@ def run_occlusion(applicant: dict, custom_prompt: str = None, positive_label: st
 
 
 #Occlusion für einen der eingebauten Testantragsteller
-@app.get("/occlusion-test/{applicant_id}")
-def occlusion_test(applicant_id: int):
+@app.post("/occlusion-test/{applicant_id}")
+async def occlusion_test(applicant_id: int, payload: dict = None):
     applicant = next((a for a in CREDIT_APPLICANTS if a["id"] == applicant_id), None)
     if not applicant:
         raise HTTPException(status_code=404, detail="Applicant not found")
 
-    result = run_occlusion(applicant)
+    payload = payload or {}
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
+    result = run_occlusion(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
     result["applicant_id"] = applicant_id
     return result
 
@@ -663,22 +701,30 @@ async def occlusion_test_custom(payload: dict):
     return result
 
 #Robustness-Test für einen eingebauten Testantragsteller
-@app.get("/robustness-test/{applicant_id}")
-def robustness_test(applicant_id: int):
+@app.post("/robustness-test/{applicant_id}")
+async def robustness_test(applicant_id: int, payload: dict = None):
     applicant = next((a for a in CREDIT_APPLICANTS if a["id"] == applicant_id), None)
     if not applicant:
         raise HTTPException(status_code=404, detail="Applicant not found")
-    result = run_robustness_test(applicant)
+    payload = payload or {}
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
+    result = run_robustness_test(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
     result["applicant_id"] = applicant_id
     return result
 
 #Erweiterter Robustness-Test (Treatment für Risiko 8) - testet 5 statt 3 Perturbationsvarianten
-@app.get("/robustness-test-extended/{applicant_id}")
-def robustness_test_extended(applicant_id: int):
+@app.post("/robustness-test-extended/{applicant_id}")
+async def robustness_test_extended(applicant_id: int, payload: dict = None):
     applicant = next((a for a in CREDIT_APPLICANTS if a["id"] == applicant_id), None)
     if not applicant:
         raise HTTPException(status_code=404, detail="Applicant not found")
-    result = run_robustness_test(applicant, extended=True)
+    payload = payload or {}
+    custom_prompt = payload.get("custom_prompt")
+    positive_label = payload.get("positive_label", "approved")
+    negative_label = payload.get("negative_label", "rejected")
+    result = run_robustness_test(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, extended=True)
     result["applicant_id"] = applicant_id
     return result
 
