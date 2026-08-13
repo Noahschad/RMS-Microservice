@@ -165,6 +165,7 @@ def run_robustness_test(applicant: dict, custom_prompt: str = None, positive_lab
                 "model": OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False,
+                "keep_alive": "30m",
                 "options": {"temperature": 0, "seed": 42}
             })
             response.raise_for_status()
@@ -221,6 +222,7 @@ def warm_up_model():
             "model": OLLAMA_MODEL,
             "prompt": "Hello",
             "stream": False,
+            "keep_alive": "30m",
             "options": {"temperature": 0, "seed": 42}
         }, timeout=60)
         print(f"[startup] Warmed up {OLLAMA_MODEL}")
@@ -292,6 +294,7 @@ def ollama_test(payload: OllamaTestRequest):
             "model": OLLAMA_MODEL,
             "prompt": payload.prompt,
             "stream": False,
+            "keep_alive": "30m",
             "options": {
                 "temperature": 0,
                 "seed": 42
@@ -316,6 +319,7 @@ def credit_test(applicant_id: int):
             "model": OLLAMA_MODEL,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": "30m",
             "options": {
                 "temperature": 0,
                 "seed": 42
@@ -346,6 +350,7 @@ def compute_credit_metrics(omit_field: str = None, custom_prompt: str = None, po
                 "model": OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False,
+                "keep_alive": "30m",
                 "options": {
                     "temperature": 0,
                     "seed": 42
@@ -416,6 +421,7 @@ def compute_credit_metrics_for(applicants: list, omit_field: str = None, custom_
                 "model": OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False,
+                "keep_alive": "30m",
                 "options": {
                     "temperature": 0,
                     "seed": 42
@@ -624,6 +630,7 @@ def run_occlusion(applicant: dict, custom_prompt: str = None, positive_label: st
                 "model": OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False,
+                "keep_alive": "30m",
                 "options": {
                     "temperature": 0,
                     "seed": 42
