@@ -1293,7 +1293,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                             )
                         ) : (
                             <select style={{ ...styles.input, width: '80px' }} value={occlusionApplicantId} onChange={e => setOcclusionApplicantId(Number(e.target.value))}>
-                                {Array.from({ length: 10 }, (_, i) => i + 1).map(id => <option key={id} value={id}>#{id}</option>)}
+                                {Array.from({ length: 8 }, (_, i) => i + 1).map(id => <option key={id} value={id}>#{id}</option>)}
                             </select>
                         )}
                         <button
@@ -1371,7 +1371,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                                     )
                                 ) : (
                                     <select style={{ ...styles.input, width: '80px' }} value={robustnessApplicantId} onChange={e => setRobustnessApplicantId(Number(e.target.value))}>
-                                        {Array.from({ length: 10 }, (_, i) => i + 1).map(id => <option key={id} value={id}>#{id}</option>)}
+                                        {Array.from({ length: 8 }, (_, i) => i + 1).map(id => <option key={id} value={id}>#{id}</option>)}
                                     </select>
                                 )}
                                 <button
@@ -1726,7 +1726,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                         body: JSON.stringify({ applicant, custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
                     })
                 } else {
-                    response = await fetch('http://127.0.0.1:8000/robustness-test-extended/9')
+                    response = await fetch('http://127.0.0.1:8000/robustness-test-extended/8')
                 }
                 if (!response.ok) throw new Error('Backend returned an error')
                 const data = await response.json()
@@ -2536,12 +2536,12 @@ export default function App() {
     const [modelCheckResult, setModelCheckResult] = useState(null)
     const [modelCheckError, setModelCheckError] = useState(null)
 
-    const [occlusionApplicantId, setOcclusionApplicantId] = useState(9)
+    const [occlusionApplicantId, setOcclusionApplicantId] = useState(8)
     const [occlusionLoading, setOcclusionLoading] = useState(false)
     const [occlusionResult, setOcclusionResult] = useState(null)
     const [occlusionError, setOcclusionError] = useState(null)
 
-    const [robustnessApplicantId, setRobustnessApplicantId] = useState(9)
+    const [robustnessApplicantId, setRobustnessApplicantId] = useState(8)
     const [robustnessRowIndex, setRobustnessRowIndex] = useState(0)
     const [robustnessLoading, setRobustnessLoading] = useState(false)
     const [robustnessResult, setRobustnessResult] = useState(null)

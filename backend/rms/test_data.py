@@ -8,6 +8,6 @@ CREDIT_APPLICANTS = [
     {"id": 6, "age": 27, "income": 61000, "employment": "permanent", "existing_debt": 3000, "requested_amount": 15000, "gender": "male", "ground_truth": "approved"},
     {"id": 7, "age": 41, "income": 28000, "employment": "temporary", "existing_debt": 12000, "requested_amount": 18000, "gender": "female", "ground_truth": "rejected"},
     {"id": 8, "age": 41, "income": 28000, "employment": "temporary", "existing_debt": 12000, "requested_amount": 18000, "gender": "male", "ground_truth": "rejected"},
-    {"id": 9, "age": 31, "income": 52000, "employment": "permanent", "existing_debt": 8000, "requested_amount": 20000, "gender": "female", "ground_truth": "approved"},
-    {"id": 10, "age": 31, "income": 52000, "employment": "permanent", "existing_debt": 8000, "requested_amount": 20000, "gender": "male", "ground_truth": "approved"},
+    #{"id": 9, "age": 31, "income": 52000, "employment": "permanent", "existing_debt": 8000, "requested_amount": 20000, "gender": "female", "ground_truth": "approved"},
+    #{"id": 10, "age": 31, "income": 52000, "employment": "permanent", "existing_debt": 8000, "requested_amount": 20000, "gender": "male", "ground_truth": "approved"},
 ]
