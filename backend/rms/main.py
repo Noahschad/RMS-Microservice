@@ -645,7 +645,21 @@ async def occlusion_aggregated(payload: dict = None):
     custom_prompt = payload.get("custom_prompt")
     positive_label = payload.get("positive_label", "approved")
     negative_label = payload.get("negative_label", "rejected")
-    tested_applicants = CREDIT_APPLICANTS[:2]
+    applicant_id = payload.get("applicant_id")
+
+    #Der ursprünglich im Einzeltest geprüfte Antragsteller wird immer mit einbezogen, damit die erweiterte Occlusion-Prüfung tatsächlich zusätzliche Evidenz zum selben Fall liefert
+    if applicant_id is not None:
+        primary = next((a for a in CREDIT_APPLICANTS if a["id"] == applicant_id), None)
+        if not primary:
+            raise HTTPException(status_code=404, detail="Applicant not found")
+
+        #Der zweite getestete Antragsteller ist der Gender-Paar-Partner
+        pair_partner_id = applicant_id - 1 if applicant_id % 2 == 0 else applicant_id + 1
+        other = next((a for a in CREDIT_APPLICANTS if a["id"] == pair_partner_id), None)
+        tested_applicants = [primary, other] if other else [primary]
+    else:
+        tested_applicants = CREDIT_APPLICANTS[:2]
+
     return compute_occlusion_aggregated(tested_applicants, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, use_fixed_formatting=True)
 
 #Generische Occlusion-Aggregation für Upload-Daten (mindestens 2 Zeilen erforderlich)

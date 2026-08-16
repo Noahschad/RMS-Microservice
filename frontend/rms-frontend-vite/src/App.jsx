@@ -554,6 +554,7 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult, robustne
         return {
             level,
             reason: `The fairness test found a score of ${modelCheckResult.counterfactual_fairness} - meaning gender changed the AI's decision in a notable share of test cases.`,
+            impactHint: `Consider how severe the consequence would be for an affected applicant e.g. losing access to credit they were entitled to, based on a protected characteristic rather than their actual creditworthiness.`,
         }
     }
     if (riskId === 8 && robustnessResult) {
@@ -562,7 +563,11 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult, robustne
         const reason = robustnessResult.flip_rate === 0
             ? `The robustness test found that the decision stayed the same across all differently formatted, but meaning-equivalent versions of the same applicant - suggesting the AI's output is reliable regardless of surface formatting in this test.`
             : `The robustness test found that ${pct}% of differently formatted, but meaning-equivalent versions of the same applicant led to a different decision - suggesting the AI's output is not always reliable regardless of surface formatting.`
-        return { level, reason }
+        return {
+            level,
+            reason,
+            impactHint: `Consider how severe the consequence would be if a decision changes based only on formatting e.g. an applicant being wrongly rejected or wrongly approved for reasons unrelated to their actual situation.`,
+        }
     }
     if (riskId === 2 && occlusionResult) {
         const total = occlusionResult.occlusion_results.length
@@ -571,6 +576,7 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult, robustne
         return {
             level,
             reason: `${influential} out of ${total} pieces of information changed the AI's decision when removed.`,
+            impactHint: `Consider how severe the consequence would be if this decision could not be explained to an affected applicant or an auditor e.g. for regulatory scrutiny or an individual's right to contest the decision.`,
         }
     }
     return null
@@ -931,7 +937,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                 <div style={{ ...styles.card, marginBottom: '16px', background: '#fff8e1', border: '1px solid #f9a825' }}>
                     <p style={{ margin: 0, fontSize: '13px', color: '#8d6e00' }}>
                         <strong>Re-assessment detected.</strong> This AI system was last assessed at lifecycle stage "<strong>{previousPhase}</strong>".
-                        The Domain typically stays the same across re-assessments of the same system - please check below whether the
+                        The Domain typically stays the same across re-assessments of the same system. Please check below whether the
                         <strong> Lifecycle Stage</strong> needs to be updated to reflect progress.
                     </p>
                 </div>
@@ -1043,6 +1049,12 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
         <div style={styles.page}>
             <h1 style={styles.heading}>AI Model Check</h1>
             <p style={styles.sub}>Run technical checks on the connected AI system before identifying risks - ISO/IEC 23894 Cl. 6.4.2</p>
+
+            <div style={{ background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px', padding: '12px 16px', marginBottom: '20px' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
+                    <strong>These tests are optional, but recommended.</strong> Running them provides concrete evidence for the next step (Risk Identification). You can also continue without running any tests and assess risks based on judgment alone.
+                </p>
+            </div>
             {resultsFromPreviousStage && modelCheckResult && (
                 <div style={{ background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px', padding: '12px 16px', marginBottom: '20px' }}>
                     <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
@@ -1157,7 +1169,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                     <>
                         <div style={{ background: '#e3f2fd', border: '1px solid #90caf9', borderRadius: '6px', padding: '10px 14px', marginBottom: '14px' }}>
                             <p style={{ margin: 0, fontSize: '13px', color: '#1565c0' }}>
-                                This is the prompt and label pair used for the built-in Finance dataset. You can review it below, or adjust it if you want to test a different framing.
+                                This is the original prompt used for the built-in Finance dataset. You can review it below, or adjust it if you want to test a different framing.
                             </p>
                         </div>
 
@@ -1244,7 +1256,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                         disabled={modelCheckLoading || !readyForChecks}
                         style={{ ...styles.button, marginTop: 0, opacity: (modelCheckLoading || !readyForChecks) ? 0.6 : 1, cursor: (modelCheckLoading || !readyForChecks) ? 'not-allowed' : 'pointer' }}
                     >
-                        {modelCheckLoading ? 'Running Test...' : 'Run AI Model Check'}
+                        {modelCheckLoading ? 'Please wait, Running Test...' : 'Run AI Model Check'}
                     </button>
 
                     {modelCheckError && (
@@ -1343,7 +1355,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                             disabled={occlusionLoading || !readyForChecks || (dataSource === 'upload' && uploadedRows.length === 0)}
                             style={{ ...styles.button, marginTop: 0, opacity: (occlusionLoading || !readyForChecks) ? 0.6 : 1, cursor: (occlusionLoading || !readyForChecks) ? 'not-allowed' : 'pointer' }}
                         >
-                            {occlusionLoading ? 'Running Test...' : 'Run Occlusion Test'}
+                            {occlusionLoading ? 'Please wait, Running Test...' : 'Run Occlusion Test'}
                         </button>
                     </div>
 
@@ -1421,7 +1433,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                                     disabled={robustnessLoading || !readyForChecks || (dataSource === 'upload' && uploadedRows.length === 0)}
                                     style={{ ...styles.button, marginTop: 0, opacity: (robustnessLoading || !readyForChecks) ? 0.6 : 1, cursor: (robustnessLoading || !readyForChecks) ? 'not-allowed' : 'pointer' }}
                                 >
-                                    {robustnessLoading ? 'Running Test...' : 'Run Robustness Test'}
+                                    {robustnessLoading ? 'Please wait, Running Test...' : 'Run Robustness Test'}
                                 </button>
                             </div>
 
@@ -1466,7 +1478,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                 </div>
             </CheckSection>
 
-            <NavButtons currentStep={2} onBack={onBack} onNext={onNext} nextLabel="Continue to Risk Identification →" nextDisabled={!modelCheckResult} />
+            <NavButtons currentStep={2} onBack={onBack} onNext={onNext} nextLabel="Continue to Risk Identification →" nextDisabled={false} />
         </div>
     )
 }
@@ -1490,8 +1502,8 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
             setRisks([...risks, {
                 ...risk,
                 likelihood: 'Moderate',
-                impact: 'Moderate',
-                level: getRiskLevel('Moderate', 'Moderate'),
+                impact: '',
+                level: getRiskLevel('Moderate', ''),
                 treatmentStatus: 'none',
                 treatmentOption: '',
                 treatmentNote: '',
@@ -1579,6 +1591,16 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
 //Risk level Berechnung
 function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, robustnessResult, onOpenModelCheckPanel }) {
     const [appliedSuggestions, setAppliedSuggestions] = useState({})
+    const [activePhase, setActivePhase] = useState({})
+
+    const allRisksEvaluated = risks.every(r => r.likelihood && r.impact)
+
+    function getActivePhase(riskId) {
+        return activePhase[riskId] || 1
+    }
+    function setPhase(riskId, phase) {
+        setActivePhase(prev => ({ ...prev, [riskId]: phase }))
+    }
     //Einzelnes Feld ändern
     function update(id, field, value) {
         setRisks(risks.map(r => {
@@ -1588,11 +1610,11 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
             return updated
         }))
     }
-    //Beide Felder ändern
-    function updateBoth(id, likelihood, impact) {
+    //Nur Likelihood wird aus der AI Model Evidence übernommen - Impact ist eine Bewertung der Schwere der Konsequenz für Betroffene, keine technische Modell-Messung, und bleibt bewusst eine manuelle Einschätzung des Nutzers
+    function applyLikelihoodSuggestion(id, likelihood) {
         setRisks(risks.map(r => {
             if (r.id !== id) return r
-            return { ...r, likelihood, impact, level: getRiskLevel(likelihood, impact) }
+            return { ...r, likelihood, level: getRiskLevel(likelihood, r.impact) }
         }))
         setAppliedSuggestions(prev => ({ ...prev, [id]: true }))
     }
@@ -1638,49 +1660,82 @@ function StepRiskEvaluation({ risks, setRisks, likelihoodScale, impactScale, ass
                                 <strong>{risk.title}</strong>
                                 <p style={{ margin: '4px 0 0', color: '#555', fontSize: '13px' }}>{risk.description}</p>
                             </div>
-                            <span style={{ ...styles.badge, background: c.bg, color: c.text, whiteSpace: 'nowrap', marginLeft: '16px' }}>{risk.level}</span>
+                            <div style={{ textAlign: 'right', marginLeft: '16px' }}>
+                                <div style={{ fontSize: '13px', color: '#666', fontWeight: 'bold', marginBottom: '6px' }}>Overall Risk Level</div>
+                                <span style={{ ...styles.badge, background: c.bg, color: c.text, whiteSpace: 'nowrap', fontSize: '18px', padding: '8px 20px' }}>{risk.level}</span>
+                            </div>
                         </div>
                         {/*Nur bei Risiken 10,8,2*/}
-                        {suggestion && (
-                            <div style={{ background: '#fff8e1', border: '1px solid #f9a825', borderRadius: '6px', padding: '12px', marginBottom: '14px' }}>
-                                <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#8d6e00' }}>
-                                    <strong>AI Model Evidence:</strong> {suggestion.reason}
-                                </p>
-                                <button
-                                    onClick={() => updateBoth(risk.id, suggestion.level, suggestion.level)}
-                                    style={{ ...styles.buttonSelected, marginTop: 0, background: '#8d6e00', fontSize: '12px' }}
-                                >
-                                    ✓ Apply Suggested Likelihood and Impact ("{suggestion.level}")
-                                </button>
-                                {appliedSuggestions[risk.id] && (
-                                    <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#2e7d32', fontWeight: 'bold' }}>
-                                        ✓ Applied - Likelihood and Impact set to "{suggestion.level}".
+                        <CheckSection
+                            number={1}
+                            title="Assess Likelihood"
+                            done={getActivePhase(risk.id) > 1}
+                            isActive={getActivePhase(risk.id) === 1}
+                            onHeaderClick={() => setPhase(risk.id, 1)}
+                            plain
+                        >
+                            {suggestion && (
+                                <div style={{ background: '#fff8e1', border: '1px solid #f9a825', borderRadius: '6px', padding: '12px', marginBottom: '14px' }}>
+                                    <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#8d6e00' }}>
+                                        <strong>AI Model Evidence:</strong> {suggestion.reason}
                                     </p>
-                                )}
-                            </div>
-                        )}
+                                    <button
+                                        onClick={() => applyLikelihoodSuggestion(risk.id, suggestion.level)}
+                                        style={{ ...styles.buttonSelected, marginTop: 0, background: '#8d6e00', fontSize: '12px' }}
+                                    >
+                                        ✓ Apply Suggested Likelihood ("{suggestion.level}")
+                                    </button>
+                                    {appliedSuggestions[risk.id] && (
+                                        <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#2e7d32', fontWeight: 'bold' }}>
+                                            ✓ Applied - Likelihood set to "{suggestion.level}".
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                            <label style={styles.label}>Likelihood (NIST SP 800-30 Table G-3)</label>
+                            <FieldHint text="How likely is this risk to occur?" />
+                            <select style={{ ...styles.input, marginBottom: '14px' }} value={risk.likelihood} onChange={e => update(risk.id, 'likelihood', e.target.value)}>
+                                {likelihoodScale.map(l => <option key={l.value}>{l.value}</option>)}
+                            </select>
+                            <button onClick={() => setPhase(risk.id, 2)} style={{ ...styles.button, marginTop: 0 }}>
+                                Continue to Impact →
+                            </button>
+                        </CheckSection>
 
-                        <div style={{ display: 'flex', gap: '16px' }}>
-                            <div style={{ flex: 1 }}>
-                                <label style={styles.label}>Likelihood (NIST SP 800-30 Table G-3)</label>
-                                <FieldHint text="How likely is this risk to occur?" />
-                                <select style={styles.input} value={risk.likelihood} onChange={e => update(risk.id, 'likelihood', e.target.value)}>
-                                    {likelihoodScale.map(l => <option key={l.value}>{l.value}</option>)}
-                                </select>
-                            </div>
-                            <div style={{ flex: 1 }}>
-                                <label style={styles.label}>Impact (NIST SP 800-30 Table H-3)</label>
-                                <FieldHint text="How severe would the harm be if it occurred?" />
-                                <select style={styles.input} value={risk.impact} onChange={e => update(risk.id, 'impact', e.target.value)}>
-                                    {impactScale.map(i => <option key={i.value}>{i.value}</option>)}
-                                </select>
-                            </div>
-                        </div>
+                        <CheckSection
+                            number={2}
+                            title="Assess Impact"
+                            done={false}
+                            isActive={getActivePhase(risk.id) === 2}
+                            onHeaderClick={() => setPhase(risk.id, 2)}
+                            plain
+                        >
+                            <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#8d6e00', fontWeight: 'bold' }}>
+                                Not assessed automatically: Please select a value based on your own judgment.
+                            </p>
+                            {suggestion?.impactHint && (
+                                <p style={{ margin: '0 0 10px', fontSize: '13px', color: '#8d6e00', fontStyle: 'italic' }}>
+                                    {suggestion.impactHint}
+                                </p>
+                            )}
+                            <label style={styles.label}>Impact (NIST SP 800-30 Table H-3)</label>
+                            <FieldHint text="How severe would the harm be if it occurred?" />
+                            <select style={styles.input} value={risk.impact} onChange={e => update(risk.id, 'impact', e.target.value)}>
+                                <option value="">- Select Impact -</option>
+                                {impactScale.map(i => <option key={i.value}>{i.value}</option>)}
+                            </select>
+                        </CheckSection>
                     </div>
                 )
             })}
 
-            <NavButtons currentStep={4} onBack={onBack} onNext={saveAndContinue} nextLabel="Continue to Treatment →" />
+            <NavButtons
+                currentStep={4}
+                onBack={onBack}
+                onNext={saveAndContinue}
+                nextDisabled={!allRisksEvaluated}
+                nextLabel={allRisksEvaluated ? 'Continue to Treatment →' : `${risks.filter(r => !r.likelihood || !r.impact).length} risk(s) still need Likelihood/Impact`}
+            />
         </div>
     )
 }
@@ -1751,14 +1806,16 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                 const data = await response.json()
                 setMitigatedResult(data)
 
-                const newLevel = data.counterfactual_fairness > 0.1 ? 'Moderate' : 'Low'
+                const FAIRNESS_ACCEPTABLE_THRESHOLD = 0.1
+                const newScore = (data.counterfactual_fairness / FAIRNESS_ACCEPTABLE_THRESHOLD) * 20
+                const newLevel = scoreToNistLevel(newScore)
                 setRisks(risks.map(r => r.id !== id ? r : {
                     ...r,
                     treatmentOption: suggestion.option,
                     treatmentNote: suggestion.note,
                     residualLikelihood: newLevel,
-                    residualImpact: newLevel,
-                    residualLevel: getRiskLevel(newLevel, newLevel),
+                    residualImpact: r.impact,
+                    residualLevel: getRiskLevel(newLevel, r.impact),
                     treatmentStatus: 'suggested',
                 }))
             } else if (id === 8) {
@@ -1772,7 +1829,8 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                         body: JSON.stringify({ applicant, custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
                     })
                 } else {
-                    response = await fetch('http://127.0.0.1:8000/robustness-test-extended/8', {
+                    const robustnessTestedId = robustnessResult?.applicant_id || 8
+                    response = await fetch(`http://127.0.0.1:8000/robustness-test-extended/${robustnessTestedId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
@@ -1805,7 +1863,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                     response = await fetch('http://127.0.0.1:8000/occlusion-aggregated', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel }),
+                        body: JSON.stringify({ custom_prompt: customPrompt, positive_label: positiveLabel, negative_label: negativeLabel, applicant_id: occlusionResult?.applicant_id }),
                     })
                 }
                 if (!response.ok) throw new Error('Backend returned an error')
@@ -1971,8 +2029,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                         {isLowInitial && risk.treatmentStatus !== 'confirmed' && !treatAnyway[risk.id] && (
                             <div style={{ borderTop: '1px solid #e0e0e0', paddingTop: '14px' }}>
                                 <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#555' }}>
-                                    This risk is already assessed as "{risk.level}" - ISO 31000 Cl. 6.5.1 does not require active treatment
-                                    at this level. You can accept it, or choose to treat it anyway.
+                                    This risk is already assessed as "{risk.level}". You can accept it, or choose to treat it anyway.
                                 </p>
                                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                     <button
@@ -2014,37 +2071,80 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                             </p>
 
                                             {/*Echtes Mitigations-Ergebnis für Risiko 10*/}
-                                            {risk.id === 10 && simDone[risk.id] && mitigatedResult && (
-                                                <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
-                                                    <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
-                                                        Re-ran the test with gender removed from the prompt
-                                                    </p>
-                                                    <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
-                                                        Counterfactual Fairness: {modelCheckResult ? modelCheckResult.counterfactual_fairness : '?'} → <strong>{mitigatedResult.counterfactual_fairness}</strong>
-                                                        {modelCheckResult && mitigatedResult.counterfactual_fairness < modelCheckResult.counterfactual_fairness
-                                                            ? ' (improved)'
-                                                            : ' (no improvement in this run)'}
-                                                    </p>
-                                                </div>
-                                            )}
+                                            {risk.id === 10 && simDone[risk.id] && mitigatedResult && (() => {
+                                                const FAIRNESS_ACCEPTABLE_THRESHOLD = 0.1
+                                                const initialCf = modelCheckResult ? modelCheckResult.counterfactual_fairness : null
+                                                const newCf = mitigatedResult.counterfactual_fairness
+                                                const increased = initialCf !== null && newCf > initialCf
+                                                const boxColor = increased
+                                                    ? { bg: '#fff3e0', border: '#e65100', text: '#e65100' }
+                                                    : { bg: '#e8f5e9', border: '#2e7d32', text: '#2e7d32' }
+
+                                                const initialLevel = initialCf !== null ? scoreToNistLevel((initialCf / FAIRNESS_ACCEPTABLE_THRESHOLD) * 20) : null
+                                                const newLevel = scoreToNistLevel((newCf / FAIRNESS_ACCEPTABLE_THRESHOLD) * 20)
+                                                const categoryChanged = initialLevel !== null && initialLevel !== newLevel
+
+                                                return (
+                                                    <div style={{ background: boxColor.bg, border: `1px solid ${boxColor.border}`, borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
+                                                        <p style={{ margin: '0 0 6px', fontSize: '13px', color: boxColor.text, fontWeight: 'bold' }}>
+                                                            Re-ran the test with gender removed from the prompt
+                                                        </p>
+                                                        <p style={{ margin: 0, fontSize: '13px', color: boxColor.text }}>
+                                                            Counterfactual Fairness: {initialCf !== null ? initialCf : '?'} → <strong>{newCf}</strong>
+                                                            {initialCf !== null
+                                                                ? (newCf < initialCf ? ' (improved)' : newCf === initialCf ? ' (unchanged)' : ' (worsened)')
+                                                                : ''}
+                                                        </p>
+                                                        {increased && (
+                                                            <p style={{ margin: '6px 0 0', fontSize: '13px', color: boxColor.text, fontWeight: 'bold' }}>
+                                                                {categoryChanged
+                                                                    ? `This raises the likelihood rating from "${initialLevel}" to "${newLevel}" - removing gender from the prompt did not reduce the fairness problem in this run.`
+                                                                    : `The likelihood rating stays "${newLevel}" despite the increase.`}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })()}
 
                                             {/*Extended Robustness Ergebnis für Risiko 8*/}
-                                            {risk.id === 8 && simDone[risk.id] && extendedValidationResult && (
-                                                <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
-                                                    <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
-                                                        Tested {extendedValidationResult.variant_results.length} reformulated variants instead of 3
-                                                    </p>
-                                                    <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#2e7d32' }}>
-                                                        Baseline decision: <strong>{extendedValidationResult.baseline_decision}</strong> · Flip rate: <strong>{Math.round(extendedValidationResult.flip_rate * 100)}%</strong>
-                                                        {robustnessResult && ` (initial check: ${Math.round(robustnessResult.flip_rate * 100)}%)`}
-                                                    </p>
-                                                    <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
-                                                        {extendedValidationResult.flip_rate > 0.3
-                                                            ? 'A substantial share of reformulated versions changed the decision, confirming that the output is sensitive to surface formatting rather than being an isolated one-off result.'
-                                                            : 'Most reformulated versions kept the same decision, suggesting the model\'s output is reasonably stable across this kind of variation.'}
-                                                    </p>
-                                                </div>
-                                            )}
+                                            {risk.id === 8 && simDone[risk.id] && extendedValidationResult && (() => {
+                                                const initialRate = robustnessResult ? robustnessResult.flip_rate : null
+                                                const increased = initialRate !== null && extendedValidationResult.flip_rate > initialRate
+                                                const boxColor = increased
+                                                    ? { bg: '#fff3e0', border: '#e65100', text: '#e65100' }
+                                                    : { bg: '#e8f5e9', border: '#2e7d32', text: '#2e7d32' }
+
+                                                //Vergleicht nicht nur die rohen Prozentwerte, sondern die tatsächliche NIST-Kategorie (Very Low/Low/Moderate/High/Very High)
+                                                const initialLevel = initialRate !== null ? scoreToNistLevel(initialRate * 100) : null
+                                                const newLevel = scoreToNistLevel(extendedValidationResult.flip_rate * 100)
+                                                const categoryChanged = initialLevel !== null && initialLevel !== newLevel
+
+                                                return (
+                                                    <div style={{ background: boxColor.bg, border: `1px solid ${boxColor.border}`, borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
+                                                        <p style={{ margin: '0 0 6px', fontSize: '13px', color: boxColor.text, fontWeight: 'bold' }}>
+                                                            Tested {extendedValidationResult.variant_results.length} reformulated variants instead of 3
+                                                        </p>
+                                                        <p style={{ margin: '0 0 4px', fontSize: '13px', color: boxColor.text }}>
+                                                            Baseline decision: <strong>{extendedValidationResult.baseline_decision}</strong> · Flip rate: <strong>{Math.round(extendedValidationResult.flip_rate * 100)}%</strong>
+                                                            {initialRate !== null && ` (initial check: ${Math.round(initialRate * 100)}%)`}
+                                                        </p>
+                                                        <p style={{ margin: 0, fontSize: '13px', color: boxColor.text }}>
+                                                            {increased
+                                                                ? `The extended test found additional format-sensitive behavior that the initial check did not detect (flip rate increased from ${Math.round(initialRate * 100)}% to ${Math.round(extendedValidationResult.flip_rate * 100)}%). This does not invalidate the initial check - it shows why testing more variants matters, since a small sample can miss issues a larger one reveals.`
+                                                                : extendedValidationResult.flip_rate > 0.3
+                                                                    ? 'A substantial share of reformulated versions changed the decision, confirming that the output is sensitive to surface formatting rather than being an isolated one-off result.'
+                                                                    : 'Most reformulated versions kept the same decision, suggesting the model\'s output is reasonably stable across this kind of variation.'}
+                                                        </p>
+                                                        {increased && (
+                                                            <p style={{ margin: '6px 0 0', fontSize: '13px', color: boxColor.text, fontWeight: 'bold' }}>
+                                                                {categoryChanged
+                                                                    ? `This also raises the likelihood rating from "${initialLevel}" to "${newLevel}".`
+                                                                    : `The likelihood rating stays "${newLevel}" despite the increase, so this is not a major concern here.`}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })()}
 
                                             {/*Aggregated Occlusion Ergebnis für Risiko 2*/}
                                             {risk.id === 2 && simDone[risk.id] && occlusionAggregatedResult && (
@@ -2067,7 +2167,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                     <p style={{ margin: 0, fontSize: '13px', color: '#2e7d32' }}>
                                                         {occlusionAggregatedResult.field_influence_summary[0]?.influential_rate >= 0.6
                                                             ? 'A consistent pattern was found across applicants, improving the reliability of this explanation.'
-                                                            : 'No single feature was consistently influential - the model\'s decision basis remains difficult to explain reliably.'}
+                                                            : 'No single feature was consistently influential across applicants - the model\'s decision basis remains difficult to explain reliably.'}
                                                     </p>
                                                 </div>
                                             )}
@@ -2094,7 +2194,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                             }}
                                                         >
                                                             {simulating === risk.id
-                                                                ? 'Running Test...'
+                                                                ? 'Please wait, Running Test...'
                                                                 : simDone[risk.id]
                                                                     ? 'Completed'
                                                                     : `${TREATMENT_SUGGESTIONS[risk.id].simulationButton}`}
@@ -2320,7 +2420,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
 }
 
 //Report Seite
-function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinish }) {
+function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinish, assessorNotes, setAssessorNotes }) {
     const high = risks.filter(r => r.level === 'High' || r.level === 'Very High').length
 
     const [downloading, setDownloading] = useState(false)
@@ -2371,6 +2471,19 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
 
         //Trennlinie
         doc.line(20, y, 190, y); y += 10
+
+        //Assessor Notes (falls vorhanden)
+        if (assessorNotes && assessorNotes.trim()) {
+            doc.setFontSize(12)
+            doc.setFont('helvetica', 'bold')
+            doc.text('Assessor Notes', 20, y); y += 8
+            doc.setFontSize(10)
+            doc.setFont('helvetica', 'normal')
+            const notesLines = doc.splitTextToSize(assessorNotes, 165)
+            doc.text(notesLines, 20, y)
+            y += notesLines.length * 5 + 8
+            doc.line(20, y, 190, y); y += 10
+        }
 
         //Risiken
         doc.setFontSize(12)
@@ -2452,6 +2565,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
         <div style={styles.page}>
             <h1 style={styles.heading}>Report</h1>
             <p style={styles.sub}>Risk Assessment Documentation - EU AI Act Art. 9 · Annex IV</p>
+
             <div style={styles.card}>
                 <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '17px' }}>Assessment Info</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '20px' }}>
@@ -2495,7 +2609,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
                     </div>
                 </div>
 
-                <div style={{ borderTop: '1px solid #eee', paddingTop: '16px', marginBottom: '20px' }}>
+                <div style={{ borderTop: '1px solid #eee', paddingTop: '16px' }}>
                     <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '17px' }}>Results Summary</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
                         <div>
@@ -2518,8 +2632,19 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div style={{ borderTop: '1px solid #eee', paddingTop: '16px' }}>
+            <div style={{ ...styles.card, marginTop: '16px' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '8px', fontSize: '17px' }}>Assessor Notes (optional)</h3>
+                <FieldHint text="Add any additional context, observations, or caveats relevant to this assessment. This text will appear in the exported report." />
+                <textarea
+                    style={{ ...styles.input, height: '100px', resize: 'vertical' }}
+                    placeholder="e.g. specific circumstances of this assessment, known caveats, follow-up items..."
+                    value={assessorNotes}
+                    onChange={e => setAssessorNotes(e.target.value)}
+                />
+
+                <div style={{ borderTop: '1px solid #eee', paddingTop: '16px', marginTop: '20px' }}>
                     <button
                         onClick={handleDownload}
                         disabled={downloading}
@@ -2590,12 +2715,12 @@ export default function App() {
     const [modelCheckResult, setModelCheckResult] = useState(null)
     const [modelCheckError, setModelCheckError] = useState(null)
 
-    const [occlusionApplicantId, setOcclusionApplicantId] = useState(8)
+    const [occlusionApplicantId, setOcclusionApplicantId] = useState(1)
     const [occlusionLoading, setOcclusionLoading] = useState(false)
     const [occlusionResult, setOcclusionResult] = useState(null)
     const [occlusionError, setOcclusionError] = useState(null)
 
-    const [robustnessApplicantId, setRobustnessApplicantId] = useState(8)
+    const [robustnessApplicantId, setRobustnessApplicantId] = useState(1)
     const [robustnessRowIndex, setRobustnessRowIndex] = useState(0)
     const [robustnessLoading, setRobustnessLoading] = useState(false)
     const [robustnessResult, setRobustnessResult] = useState(null)
@@ -2613,6 +2738,8 @@ export default function App() {
     const [customPrompt, setCustomPrompt] = useState('')
     const [positiveLabel, setPositiveLabel] = useState('')
     const [negativeLabel, setNegativeLabel] = useState('')
+
+    const [assessorNotes, setAssessorNotes] = useState('')
 
     //Beim Pagewechsel oben beginnen
     useEffect(() => {
@@ -2838,7 +2965,7 @@ export default function App() {
                 dataSource={dataSource} uploadedRows={uploadedRows} selectedUploadRowIndex={selectedUploadRowIndex}
                 customPrompt={customPrompt} positiveLabel={positiveLabel} negativeLabel={negativeLabel}
             />
-            case 6: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(5)} onFinish={() => setScreen('landing')} />
+            case 6: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(5)} onFinish={() => setScreen('landing')} assessorNotes={assessorNotes} setAssessorNotes={setAssessorNotes} />
             default: return null
         }
     }
@@ -2869,6 +2996,7 @@ export default function App() {
         setCustomPrompt('')
         setPositiveLabel('')
         setNegativeLabel('')
+        setAssessorNotes('')
         setCurrentStep(1)
         setScreen('form')
     }
