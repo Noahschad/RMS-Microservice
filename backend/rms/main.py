@@ -3,6 +3,8 @@ import re
 import requests #Schickt HTTP Anfragen an Ollama
 import csv
 import io
+import json
+import hashlib
 from fastapi import UploadFile, File, Form
 from test_data import CREDIT_APPLICANTS
 from datetime import datetime, timezone
@@ -18,6 +20,9 @@ load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME")
+
+#DEMO_MODE: wird nur am Tag der Präsentation auf "true" gesetzt (in .env).
+DEMO_MODE = os.getenv("DEMO_MODE", "false").strip().lower() == "true"
 
 #AI Kopplung
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -213,6 +218,47 @@ def run_robustness_test(applicant: dict, custom_prompt: str = None, positive_lab
 client = MongoClient(MONGO_URI)
 db = client[MONGO_DB_NAME]
 assessments_collection = db["assessments"]
+cached_test_results_collection = db["cached_test_results"]
+
+#Baut einen eindeutigen Fingerabdruck aus Testtyp + allen relevanten Eingabeparametern
+def build_config_hash(test_type: str, params: dict) -> str:
+    payload = {"test_type": test_type, **params}
+    serialized = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+#Zentrale Cache-Logik, wiederverwendbar für alle zeitintensiven Tests:
+#- Existiert bereits ein Ergebnis für exakt diese Konfiguration? -> sofort zurückgeben (Cache-Treffer)
+#- Kein Treffer + DEMO_MODE=false (normaler Testbetrieb) -> echten Test ausführen, Ergebnis cachen
+#- Kein Treffer + DEMO_MODE=true (Live-Demo) -> bewusst abbrechen statt in einen ungeplanten, mehrminütigen Live-Call zu laufen ("harte Absicherung")
+def get_or_compute(test_type: str, params: dict, compute_fn):
+    config_hash = build_config_hash(test_type, params)
+    cached = cached_test_results_collection.find_one({"config_hash": config_hash})
+
+    if cached:
+        print(f"[CACHE HIT] {test_type} ({config_hash[:8]}...)")
+        return cached["result"]
+
+    if DEMO_MODE:
+        print(f"[CACHE MISS - DEMO_MODE] {test_type} ({config_hash[:8]}...) - kein vorbereiteter Testlauf gefunden")
+        raise HTTPException(
+            status_code=409,
+            detail=f"Kein gecachtes Ergebnis für diese Konfiguration (test_type={test_type}). "
+                   f"Bitte diesen exakten Testlauf vorher einmal mit DEMO_MODE=false ausführen."
+        )
+
+    print(f"[LIVE CALL] {test_type} ({config_hash[:8]}...) - führe echten Test aus")
+    result = compute_fn()
+    cached_test_results_collection.update_one(
+        {"config_hash": config_hash},
+        {"$set": {
+            "test_type": test_type,
+            "params": params,
+            "result": result,
+            "computed_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    return result
 
 app = FastAPI(title="RMS Microservice", version="1.0.0")
 
@@ -575,7 +621,17 @@ async def credit_metrics(payload: dict = None):
     custom_prompt = payload.get("custom_prompt")
     positive_label = payload.get("positive_label", "approved")
     negative_label = payload.get("negative_label", "rejected")
-    return compute_credit_metrics(custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
+
+    params = {
+        "custom_prompt": custom_prompt,
+        "positive_label": positive_label,
+        "negative_label": negative_label,
+    }
+
+    def compute():
+        return compute_credit_metrics(custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
+
+    return get_or_compute("credit_metrics", params, compute)
 
 
 #Wiederholt denselben Test, aber ohne "gender" im Prompt
@@ -586,7 +642,17 @@ async def credit_metrics_mitigated(payload: dict = None):
     custom_prompt = payload.get("custom_prompt")
     positive_label = payload.get("positive_label", "approved")
     negative_label = payload.get("negative_label", "rejected")
-    return compute_credit_metrics(omit_field="gender", custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
+
+    params = {
+        "custom_prompt": custom_prompt,
+        "positive_label": positive_label,
+        "negative_label": negative_label,
+    }
+
+    def compute():
+        return compute_credit_metrics(omit_field="gender", custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
+
+    return get_or_compute("credit_metrics_mitigated", params, compute)
 
 #Extended Validation für Risiko 8 - mehrere unabhängige Durchläufe statt einem einzelnen
 @app.post("/credit-metrics-extended")
@@ -595,24 +661,35 @@ async def credit_metrics_extended(payload: dict = None, runs: int = 2):
     custom_prompt = payload.get("custom_prompt")
     positive_label = payload.get("positive_label", "approved")
     negative_label = payload.get("negative_label", "rejected")
-    all_results = [compute_credit_metrics(custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label) for _ in range(runs)]
-    accuracies = [r["accuracy"] for r in all_results]
-    cf_values = [r["counterfactual_fairness"] for r in all_results]
 
-    avg_accuracy = sum(accuracies) / len(accuracies)
-    avg_cf = sum(cf_values) / len(cf_values)
-    accuracy_range = (min(accuracies), max(accuracies))
-    cf_range = (min(cf_values), max(cf_values))
-
-    return {
+    params = {
+        "custom_prompt": custom_prompt,
+        "positive_label": positive_label,
+        "negative_label": negative_label,
         "runs": runs,
-        "individual_accuracies": accuracies,
-        "individual_cf_values": cf_values,
-        "average_accuracy": round(avg_accuracy, 2),
-        "average_counterfactual_fairness": round(avg_cf, 2),
-        "accuracy_range": [round(accuracy_range[0], 2), round(accuracy_range[1], 2)],
-        "cf_range": [round(cf_range[0], 2), round(cf_range[1], 2)],
     }
+
+    def compute():
+        all_results = [compute_credit_metrics(custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label) for _ in range(runs)]
+        accuracies = [r["accuracy"] for r in all_results]
+        cf_values = [r["counterfactual_fairness"] for r in all_results]
+
+        avg_accuracy = sum(accuracies) / len(accuracies)
+        avg_cf = sum(cf_values) / len(cf_values)
+        accuracy_range = (min(accuracies), max(accuracies))
+        cf_range = (min(cf_values), max(cf_values))
+
+        return {
+            "runs": runs,
+            "individual_accuracies": accuracies,
+            "individual_cf_values": cf_values,
+            "average_accuracy": round(avg_accuracy, 2),
+            "average_counterfactual_fairness": round(avg_cf, 2),
+            "accuracy_range": [round(accuracy_range[0], 2), round(accuracy_range[1], 2)],
+            "cf_range": [round(cf_range[0], 2), round(cf_range[1], 2)],
+        }
+
+    return get_or_compute("credit_metrics_extended", params, compute)
 
 
 #Generische Occlusion-Aggregation-Logik, wiederverwendbar für Built-in und Upload
@@ -660,7 +737,17 @@ async def occlusion_aggregated(payload: dict = None):
     else:
         tested_applicants = CREDIT_APPLICANTS[:2]
 
-    return compute_occlusion_aggregated(tested_applicants, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, use_fixed_formatting=True)
+    params = {
+        "custom_prompt": custom_prompt,
+        "positive_label": positive_label,
+        "negative_label": negative_label,
+        "applicant_id": applicant_id,
+    }
+
+    def compute():
+        return compute_occlusion_aggregated(tested_applicants, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, use_fixed_formatting=True)
+
+    return get_or_compute("occlusion_aggregated", params, compute)
 
 #Generische Occlusion-Aggregation für Upload-Daten (mindestens 2 Zeilen erforderlich)
 @app.post("/occlusion-aggregated-custom")
@@ -757,9 +844,20 @@ async def occlusion_test(applicant_id: int, payload: dict = None):
     custom_prompt = payload.get("custom_prompt")
     positive_label = payload.get("positive_label", "approved")
     negative_label = payload.get("negative_label", "rejected")
-    result = run_occlusion(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, use_fixed_formatting=True)
-    result["applicant_id"] = applicant_id
-    return result
+
+    params = {
+        "applicant_id": applicant_id,
+        "custom_prompt": custom_prompt,
+        "positive_label": positive_label,
+        "negative_label": negative_label,
+    }
+
+    def compute():
+        result = run_occlusion(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, use_fixed_formatting=True)
+        result["applicant_id"] = applicant_id
+        return result
+
+    return get_or_compute("occlusion_test", params, compute)
 
 
 #Occlusion für einen einzelnen, vom Frontend übergebenen Antragsteller (z.B. aus einem Upload)
@@ -787,9 +885,20 @@ async def robustness_test(applicant_id: int, payload: dict = None):
     custom_prompt = payload.get("custom_prompt")
     positive_label = payload.get("positive_label", "approved")
     negative_label = payload.get("negative_label", "rejected")
-    result = run_robustness_test(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, use_fixed_formatting=True)
-    result["applicant_id"] = applicant_id
-    return result
+
+    params = {
+        "applicant_id": applicant_id,
+        "custom_prompt": custom_prompt,
+        "positive_label": positive_label,
+        "negative_label": negative_label,
+    }
+
+    def compute():
+        result = run_robustness_test(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, use_fixed_formatting=True)
+        result["applicant_id"] = applicant_id
+        return result
+
+    return get_or_compute("robustness_test", params, compute)
 
 #Erweiterter Robustness-Test (Treatment für Risiko 8) - testet 5 statt 3 Perturbationsvarianten
 @app.post("/robustness-test-extended/{applicant_id}")
@@ -801,9 +910,20 @@ async def robustness_test_extended(applicant_id: int, payload: dict = None):
     custom_prompt = payload.get("custom_prompt")
     positive_label = payload.get("positive_label", "approved")
     negative_label = payload.get("negative_label", "rejected")
-    result = run_robustness_test(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, extended=True, use_fixed_formatting=True)
-    result["applicant_id"] = applicant_id
-    return result
+
+    params = {
+        "applicant_id": applicant_id,
+        "custom_prompt": custom_prompt,
+        "positive_label": positive_label,
+        "negative_label": negative_label,
+    }
+
+    def compute():
+        result = run_robustness_test(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label, extended=True, use_fixed_formatting=True)
+        result["applicant_id"] = applicant_id
+        return result
+
+    return get_or_compute("robustness_test_extended", params, compute)
 
 #Erweiterter Robustness-Test für Upload-Daten (Treatment für Risiko 8)
 @app.post("/robustness-test-extended-custom")
@@ -827,6 +947,18 @@ async def robustness_test_custom(payload: dict):
     positive_label = payload.get("positive_label", "approved")
     negative_label = payload.get("negative_label", "rejected")
     return run_robustness_test(applicant, custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label)
+
+#Zeigt alle aktuell gecachten Testergebnisse
+@app.get("/cached-test-results")
+def list_cached_test_results():
+    docs = list(cached_test_results_collection.find({}, {"_id": 0, "result": 0}))
+    return {"count": len(docs), "entries": docs}
+
+#Löscht gezielt gecachte Testergebnisse
+@app.delete("/cached-test-results/{test_type}")
+def delete_cached_test_results(test_type: str):
+    result = cached_test_results_collection.delete_many({"test_type": test_type})
+    return {"deleted_count": result.deleted_count, "test_type": test_type}
 
 #Assessment Endpoints
 @app.post("/assessments") #neues Assessment anlegen

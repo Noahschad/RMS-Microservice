@@ -2366,15 +2366,15 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                     </CheckSection>
 
                                 {/*Confirm Button*/}
-                                {risk.treatmentStatus === 'suggested' && (
+                                {risk.treatmentStatus === 'suggested' && getActivePhase(risk.id) === 2 && (
                                     <button onClick={() => confirmTreatment(risk.id)}
-                                        disabled={risk.residualLevel === 'High' || risk.residualLevel === 'Very High'}
-                                        style={{
-                                            ...styles.button,
-                                            marginTop: 0,
-                                            background: (risk.residualLevel === 'High' || risk.residualLevel === 'Very High') ? '#aaa' : '#2e7d32',
-                                            cursor: (risk.residualLevel === 'High' || risk.residualLevel === 'Very High') ? 'not-allowed' : 'pointer',
-                                        }}
+                                            disabled={risk.residualLevel === 'High' || risk.residualLevel === 'Very High'}
+                                            style={{
+                                                ...styles.button,
+                                                marginTop: 0,
+                                                background: (risk.residualLevel === 'High' || risk.residualLevel === 'Very High') ? '#aaa' : '#2e7d32',
+                                                cursor: (risk.residualLevel === 'High' || risk.residualLevel === 'Very High') ? 'not-allowed' : 'pointer',
+                                            }}
                                     >
                                         Confirm Treatment & Accept Residual Risk
                                     </button>
