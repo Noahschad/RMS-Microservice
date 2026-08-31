@@ -998,7 +998,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
 
             {/*Likelihood/Impact Tabellen*/}
             <EditableScaleTable scale={likelihoodScale} setScale={setLikelihoodScale} title="Likelihood Scale" source="NIST SP 800-30 Table G-3" note="Used to assess the likelihood of each identified risk. Definitions can be adapted to organisational context." />
-            <EditableScaleTable scale={impactScale} setScale={setImpactScale} title="Impact Scale" source="NIST SP 800-30 Table H-3" note="Used to assess the impact across organisational, individual, and societal dimensions (ISO/IEC 23894 Cl. 6.4.3.2)." />
+            <EditableScaleTable scale={impactScale} setScale={setImpactScale} title="Impact Scale" source="NIST SP 800-30 Table H-3" note="Used to assess the impact (ISO/IEC 23894 Cl. 6.4.3.2)." />
 
             <NavButtons currentStep={1} onBack={() => {}} onNext={save} nextDisabled={!isValid} nextLabel="Save & Continue →" />
         </div>
