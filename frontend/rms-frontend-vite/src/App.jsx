@@ -751,7 +751,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                     <div>
                         <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Extended Robustness Check</h3>
                         <p style={{ fontSize: '13px', marginBottom: '10px' }}>
-                            Baseline decision: <strong>{extendedValidationResult.baseline_decision}</strong> · Flip rate: <strong>{Math.round(extendedValidationResult.flip_rate * 100)}%</strong> (across {extendedValidationResult.variant_results.length} variants)
+                            Baseline decision: <strong>{extendedValidationResult.baseline_decision}</strong> · Flip probability: <strong>{Math.round(extendedValidationResult.flip_rate * 100)}%</strong> (across {extendedValidationResult.variant_results.length} variants)
                         </p>
                         <table style={styles.table}>
                             <thead>
@@ -807,7 +807,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                     <div>
                         <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Robustness / Consistency Check</h3>
                         <p style={{ fontSize: '13px', marginBottom: '10px' }}>
-                            Baseline decision: <strong>{robustnessResult.baseline_decision}</strong> · Flip rate: <strong>{Math.round(robustnessResult.flip_rate * 100)}%</strong>
+                            Baseline decision: <strong>{robustnessResult.baseline_decision}</strong> · Flip probability: <strong>{Math.round(robustnessResult.flip_rate * 100)}%</strong>
                         </p>
                         <table style={styles.table}>
                             <thead>
@@ -998,7 +998,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
 
             {/*Likelihood/Impact Tabellen*/}
             <EditableScaleTable scale={likelihoodScale} setScale={setLikelihoodScale} title="Likelihood Scale" source="NIST SP 800-30 Table G-3" note="Used to assess the likelihood of each identified risk. Definitions can be adapted to organisational context." />
-            <EditableScaleTable scale={impactScale} setScale={setImpactScale} title="Impact Scale" source="NIST SP 800-30 Table H-3" note="Used to assess the impact (ISO/IEC 23894 Cl. 6.4.3.2)." />
+            <EditableScaleTable scale={impactScale} setScale={setImpactScale} title="Impact Scale" source="NIST SP 800-30 Table H-3" note="Used to assess the impact of each identified risk. Definitions can be adapted to organisational context." />
 
             <NavButtons currentStep={1} onBack={() => {}} onNext={save} nextDisabled={!isValid} nextLabel="Save & Continue →" />
         </div>
@@ -1446,7 +1446,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                     {robustnessResult && (
                         <div style={{ marginTop: '12px' }}>
                             <p style={{ fontSize: '13px', marginBottom: '10px' }}>
-                                Baseline decision: <strong>{robustnessResult.baseline_decision}</strong> · Flip rate: <strong style={{ color: robustnessResult.flip_rate > 0.2 ? '#c62828' : '#2e7d32' }}>{Math.round(robustnessResult.flip_rate * 100)}%</strong>
+                                Baseline decision: <strong>{robustnessResult.baseline_decision}</strong> · Flip probability: <strong style={{ color: robustnessResult.flip_rate > 0.2 ? '#c62828' : '#2e7d32' }}>{Math.round(robustnessResult.flip_rate * 100)}%</strong>
                             </p>
                             <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
                                 {robustnessResult.flip_rate === 0
@@ -2125,12 +2125,12 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                             Tested {extendedValidationResult.variant_results.length} reformulated variants instead of 3
                                                         </p>
                                                         <p style={{ margin: '0 0 4px', fontSize: '13px', color: boxColor.text }}>
-                                                            Baseline decision: <strong>{extendedValidationResult.baseline_decision}</strong> · Flip rate: <strong>{Math.round(extendedValidationResult.flip_rate * 100)}%</strong>
+                                                            Baseline decision: <strong>{extendedValidationResult.baseline_decision}</strong> · Flip probability: <strong>{Math.round(extendedValidationResult.flip_rate * 100)}%</strong>
                                                             {initialRate !== null && ` (initial check: ${Math.round(initialRate * 100)}%)`}
                                                         </p>
                                                         <p style={{ margin: 0, fontSize: '13px', color: boxColor.text }}>
                                                             {increased
-                                                                ? `The extended test found additional format-sensitive behavior that the initial check did not detect (flip rate increased from ${Math.round(initialRate * 100)}% to ${Math.round(extendedValidationResult.flip_rate * 100)}%). This does not invalidate the initial check - it shows why testing more variants matters, since a small sample can miss issues a larger one reveals.`
+                                                                ? `The extended test found additional format-sensitive behavior that the initial check did not detect (flip probability increased from ${Math.round(initialRate * 100)}% to ${Math.round(extendedValidationResult.flip_rate * 100)}%). This does not invalidate the initial check - it shows why testing more variants matters, since a small sample can miss issues a larger one reveals.`
                                                                 : extendedValidationResult.flip_rate > 0.3
                                                                     ? 'A substantial share of reformulated versions changed the decision, confirming that the output is sensitive to surface formatting rather than being an isolated one-off result.'
                                                                     : 'Most reformulated versions kept the same decision, suggesting the model\'s output is reasonably stable across this kind of variation.'}
