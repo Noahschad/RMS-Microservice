@@ -113,7 +113,7 @@ const STEPS = [
     { id: 1, label: 'Scope & Criteria', sub: 'ISO 31000 Cl. 6.3' },
     { id: 2, label: 'AI Model Check', sub: 'NIST AI RMF 1.0 - MEASURE' },
     { id: 3, label: 'Risk Identification', sub: 'ISO/IEC 23894 Cl. 6.4.2' },
-    { id: 4, label: 'Risk Analysis', sub: 'ISO/IEC 23894 Cl. 6.4.3' },
+    { id: 4, label: 'Risk Evaluation', sub: 'ISO/IEC 23894 Cl. 6.4.3' },
     { id: 5, label: 'Risk Treatment', sub: 'ISO 31000 Cl. 6.5' },
     { id: 6, label: 'Report', sub: 'ISO 31000 Cl. 6.7' },
 ]
