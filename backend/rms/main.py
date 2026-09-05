@@ -331,6 +331,14 @@ class AssessmentUpdate(BaseModel):
     misuses: Optional[List[Any]] = None
     treatment_plans: Optional[List[Any]] = None
     status: Optional[str] = None
+    model_check_result: Optional[Any] = None
+    occlusion_result: Optional[Any] = None
+    robustness_result: Optional[Any] = None
+    data_source: Optional[str] = None
+    custom_prompt: Optional[str] = None
+    positive_label: Optional[str] = None
+    negative_label: Optional[str] = None
+    uploaded_rows: Optional[List[Any]] = None
 
 
 # MongoDB nutzt intern ein spezielles ObjectId-Format, das JSON nicht direkt
@@ -976,6 +984,14 @@ def create_assessment(payload: AssessmentCreate):
         "risks": [],
         "misuses": [],
         "treatment_plans": [],
+        "model_check_result": None,
+        "occlusion_result": None,
+        "robustness_result": None,
+        "data_source":None,
+        "custom_prompt":None,
+        "positive_label":None,
+        "negative_label":None,
+        "uploaded_rows":None
     }
     result = assessments_collection.insert_one(doc)
     doc["_id"] = result.inserted_id

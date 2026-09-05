@@ -2237,6 +2237,15 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                         </div>
                                     )}
 
+                                    {TREATMENT_SUGGESTIONS[risk.id] && manualOverride[risk.id] && (
+                                        <button
+                                            onClick={() => setManualOverride(prev => ({ ...prev, [risk.id]: false }))}
+                                            style={{ ...styles.buttonOutline, marginTop: 0, fontSize: '12px', marginBottom: '12px' }}
+                                        >
+                                            ← Back to suggested treatment
+                                        </button>
+                                    )}
+
                                     {/*Fall B: kein Vorschlag vorhanden, oder User bearbeitet manuell*/}
                                     {(!TREATMENT_SUGGESTIONS[risk.id] || manualOverride[risk.id] || editingApplied[risk.id]) && (
                                         <>
@@ -2394,7 +2403,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                     </span>
                                     <button
                                         onClick={() => {
-                                            setRisks(risks.map(r => r.id !== risk.id ? r : { ...r, treatmentStatus: 'none' }))
+                                            setRisks(risks.map(r => r.id !== risk.id ? r : { ...r, treatmentStatus: 'suggested' }))
                                             setPhase(risk.id, 1)
                                         }}
                                         style={{ ...styles.buttonOutline, marginTop: 0, fontSize: '12px' }}
@@ -2925,6 +2934,15 @@ export default function App() {
         setPreviousPhase(isReassessment ? assessment.scope.phase : null)
         setCurrentStep(isReassessment ? 1 : (assessment.current_step || 1))
         setScreen('steps')
+        setModelCheckResult(assessment.model_check_result || null)
+        setOcclusionResult(assessment.occlusion_result || null)
+        setRobustnessResult(assessment.robustness_result || null)
+        setResultsFromPreviousStage(isReassessment && !!assessment.model_check_result)
+        setDataSource(assessment.data_source || null)
+        setCustomPrompt(assessment.custom_prompt || '')
+        setPositiveLabel(assessment.positive_label || '')
+        setNegativeLabel(assessment.negative_label || '')
+        setUploadedRows(assessment.uploaded_rows || [])
     }
 
     function renderStep() {
@@ -3001,6 +3019,30 @@ export default function App() {
         setScreen('form')
     }
 
+    async function saveProgress() {
+        if (!assessmentId) return
+        await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                current_step: currentStep,
+                scope,
+                likelihood_scale: likelihoodScale,
+                impact_scale: impactScale,
+                risks,
+                misuses,
+                model_check_result: modelCheckResult,
+                occlusion_result: occlusionResult,
+                robustness_result: robustnessResult,
+                data_source: dataSource,
+                custom_prompt: customPrompt,
+                positive_label: positiveLabel,
+                negative_label: negativeLabel,
+                uploaded_rows: uploadedRows,
+            }),
+        })
+    }
+
     //Setzt nur die AI-Model-Check-bezogenen States zurück (z.B. wenn sich die Domain ändert)
     function resetModelCheckState() {
         setModelCheckResult(null)
@@ -3027,7 +3069,7 @@ export default function App() {
             <nav style={styles.nav}>
                 <div
                     style={{ ...styles.navBrand, cursor: 'pointer' }}
-                    onClick={() => { resetAll(); setScreen('landing') }}                >
+                    onClick={async () => { await saveProgress(); resetAll(); setScreen('landing') }}               >
                     RMS
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
@@ -3035,10 +3077,10 @@ export default function App() {
                         {user.aiSystemName} · {user.assessorName}
                     </div>
                     <button
-                        onClick={() => { resetAll(); setScreen('landing') }}
+                        onClick={async () => { await saveProgress(); resetAll(); setScreen('landing') }}
                         style={{ padding: '7px 16px', background: 'transparent', color: '#4fc3f7', border: '1px solid #4fc3f7', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
                     >
-                        {currentStep === 5 ? '← Back to Home' : 'Save & Exit'}
+                        {currentStep === 6 ? '← Back to Home' : 'Save & Exit'}
                     </button>
                 </div>
             </nav>
