@@ -31,6 +31,8 @@ function getRiskLevel(likelihood, impact) {
     return table[likelihood]?.[impact] ?? '-'
 }
 
+const LEVEL_ORDER = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
+
 //Liste der Risk Sources
 const RISK_CATALOG = [
     { id: 1, title: 'Biased training data', description: 'Training data does not represent the deployment population, leading to unfair outcomes.', source: 'ISO/IEC 23894 Annex B.5; MIT AI Risk Repository, Subdomain 1.1', domains: ['Healthcare', 'HR & Recruitment', 'Finance', 'Law Enforcement', 'Education'], phases: ['Inception', 'Design and Development', 'Verification and Validation', 'Re-evaluation'] },
@@ -1766,6 +1768,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
     const [mitigationError, setMitigationError] = useState(null)
 
     const [manualOverride, setManualOverride] = useState({})
+    const [acknowledgedIncrease, setAcknowledgedIncrease] = useState({})
     const [treatAnyway, setTreatAnyway] = useState({})
     const [editingApplied, setEditingApplied] = useState({})
     const [manuallyApplied, setManuallyApplied] = useState({})
@@ -2365,6 +2368,15 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                             </div>
                                         )}
 
+                                        {/*Warnung wenn eine Verschlechterung vorkommt*/}
+                                        {LEVEL_ORDER.indexOf(risk.residualLevel) > LEVEL_ORDER.indexOf(risk.level) && (
+                                            <div style={{ background: '#ffebee', border: '1px solid #c62828', borderRadius: '6px', padding: '10px', marginTop: '12px', marginBottom: '12px' }}>
+                                                <p style={{ color: '#c62828', fontSize: '13px', margin: 0 }}>
+                                                    Warning: the residual risk ({risk.residualLevel}) is higher than the initially assessed risk ({risk.level}). The treatment measure appears to have increased the risk rather than reduced it.
+                                                </p>
+                                            </div>
+                                        )}
+
                                         {/* Warnung wenn keine Verbesserung gegenüber dem Ausgangsniveau */}
                                         {risk.residualLevel === risk.level && risk.residualLevel !== 'High' && risk.residualLevel !== 'Very High' && (
                                             <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px' }}>
@@ -2377,12 +2389,12 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                 {/*Confirm Button*/}
                                 {risk.treatmentStatus === 'suggested' && getActivePhase(risk.id) === 2 && (
                                     <button onClick={() => confirmTreatment(risk.id)}
-                                            disabled={risk.residualLevel === 'High' || risk.residualLevel === 'Very High'}
+                                            disabled={(risk.residualLevel === 'High' || risk.residualLevel === 'Very High')}
                                             style={{
                                                 ...styles.button,
                                                 marginTop: 0,
-                                                background: (risk.residualLevel === 'High' || risk.residualLevel === 'Very High') ? '#aaa' : '#2e7d32',
-                                                cursor: (risk.residualLevel === 'High' || risk.residualLevel === 'Very High') ? 'not-allowed' : 'pointer',
+                                                background: ((risk.residualLevel === 'High' || risk.residualLevel === 'Very High')) ? '#aaa' : '#2e7d32',
+                                                cursor: ((risk.residualLevel === 'High' || risk.residualLevel === 'Very High')) ? 'not-allowed' : 'pointer',
                                             }}
                                     >
                                         Confirm Treatment & Accept Residual Risk
