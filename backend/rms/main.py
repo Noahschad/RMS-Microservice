@@ -329,7 +329,6 @@ class AssessmentUpdate(BaseModel):
     impact_scale: Optional[List[Any]] = None
     risks: Optional[List[Any]] = None
     misuses: Optional[List[Any]] = None
-    treatment_plans: Optional[List[Any]] = None
     status: Optional[str] = None
     model_check_result: Optional[Any] = None
     occlusion_result: Optional[Any] = None
@@ -983,7 +982,6 @@ def create_assessment(payload: AssessmentCreate):
         "impact_scale": payload.impact_scale,
         "risks": [],
         "misuses": [],
-        "treatment_plans": [],
         "model_check_result": None,
         "occlusion_result": None,
         "robustness_result": None,
