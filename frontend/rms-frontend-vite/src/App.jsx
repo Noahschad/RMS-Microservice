@@ -22,9 +22,9 @@ const DEFAULT_IMPACT_SCALE = [
 //NIST SP 800-30 Table I-2 --> Risk Level
 function getRiskLevel(likelihood, impact) {
     const table = {
-        'Very High': { 'Very Low': 'Low', 'Low': 'Moderate', 'Moderate': 'High', 'High': 'Very High', 'Very High': 'Very High' },
-        'High':      { 'Very Low': 'Low', 'Low': 'Moderate', 'Moderate': 'Moderate', 'High': 'High', 'Very High': 'Very High' },
-        'Moderate':  { 'Very Low': 'Low', 'Low': 'Low', 'Moderate': 'Moderate', 'High': 'Moderate', 'Very High': 'High' },
+        'Very High': { 'Very Low': 'Very Low', 'Low': 'Low', 'Moderate': 'Moderate', 'High': 'High', 'Very High': 'Very High' },
+        'High':      { 'Very Low': 'Very Low', 'Low': 'Low', 'Moderate': 'Moderate', 'High': 'High', 'Very High': 'Very High' },
+        'Moderate':  { 'Very Low': 'Very Low', 'Low': 'Low', 'Moderate': 'Moderate', 'High': 'Moderate', 'Very High': 'High' },
         'Low':       { 'Very Low': 'Very Low', 'Low': 'Low', 'Moderate': 'Low', 'High': 'Low', 'Very High': 'Moderate' },
         'Very Low':  { 'Very Low': 'Very Low', 'Low': 'Very Low', 'Moderate': 'Very Low', 'High': 'Low', 'Very High': 'Low' },
     }
