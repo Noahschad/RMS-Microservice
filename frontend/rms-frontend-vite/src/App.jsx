@@ -2576,7 +2576,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: 'completed', risks: risks }),
             })
-            onFinish()
+            await onFinish()
         } catch (error) {
             console.error('Failed to finish assessment:', error)
         }
@@ -2879,7 +2879,7 @@ export default function App() {
         setRobustnessLoading(false)
     }
 
-    //Wird aufgerufen, wenn der User eine Datei auswählt - liest sie ein und parsed sie fürs Occlusion-Dropdown
+    //Wird aufgerufen, wenn der User eine Datei auswählt, liest sie ein und parsed sie fürs Occlusion-Dropdown
     function handleFileSelect(file) {
         setUploadedFile(file)
         setUploadedRows([])
@@ -2995,7 +2995,10 @@ export default function App() {
                 dataSource={dataSource} uploadedRows={uploadedRows} selectedUploadRowIndex={selectedUploadRowIndex}
                 customPrompt={customPrompt} positiveLabel={positiveLabel} negativeLabel={negativeLabel}
             />
-            case 6: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(5)} onFinish={() => setScreen('landing')} assessorNotes={assessorNotes} setAssessorNotes={setAssessorNotes} />
+            case 6: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(5)} onFinish={async () => {
+                await saveProgress()
+                setScreen('landing')
+            }} assessorNotes={assessorNotes} setAssessorNotes={setAssessorNotes} />
             default: return null
         }
     }
@@ -3072,6 +3075,7 @@ export default function App() {
         setPositiveLabel('')
         setNegativeLabel('')
     }
+    
 
     if (screen === 'landing') return <LandingPage onStart={resetAll} onResume={handleResume} />
     if (screen === 'form') return <UserForm onBegin={handleBegin} onBack={() => setScreen('landing')} />
