@@ -100,24 +100,24 @@ const TREATMENT_SUGGESTIONS = {
         option: 'Change likelihood',
         note: 'Rather than relying on only three reformulated versions, test additional variants (different capitalization, and multiple changes combined) to check for a consistent robustness pattern.',
         hasSimulation: true,
-        simulationButton: 'Run Extended Robustness Test (~2-5 min)',
+        simulationButton: 'Run Extended Robustness Check (~2-5 min)',
     },
     2: {
         option: 'Change likelihood',
         note: 'Rather than relying on a single test case, check whether the same piece of information matters across several applicants. This lowers the chance that an unreliable explanation goes unnoticed.',
         hasSimulation: true,
-        simulationButton: 'Run Occlusion Across Applicants (~5-10 min)',
+        simulationButton: 'Run Occlusion Test Across Applicants (~5-10 min)',
     },
 }
 
-//5 Prozessschritte
+//6 Prozessschritte
 const STEPS = [
-    { id: 1, label: 'Scope & Criteria', sub: 'ISO 31000 Cl. 6.3' },
+    { id: 1, label: 'Scope, Context & Criteria', sub: 'ISO 31000 Cl. 6.3' },
     { id: 2, label: 'AI Model Check', sub: 'NIST AI RMF 1.0 - MEASURE' },
     { id: 3, label: 'Risk Identification', sub: 'ISO/IEC 23894 Cl. 6.4.2' },
     { id: 4, label: 'Risk Evaluation', sub: 'ISO/IEC 23894 Cl. 6.4.3' },
     { id: 5, label: 'Risk Treatment', sub: 'ISO 31000 Cl. 6.5' },
-    { id: 6, label: 'Report', sub: 'ISO 31000 Cl. 6.7' },
+    { id: 6, label: 'Recording & Reporting', sub: 'ISO 31000 Cl. 6.7' },
 ]
 
 //Hilfsfunktion für die Farbe
@@ -137,7 +137,7 @@ const COLORS = {
     cardBorder: '#a8c8e0',
 }
 
-//Schritte 1-5 --> 5 kreise nebneinander als Übersicht
+//Schritte 1-6 --> 6 kreise nebeneinander als Übersicht
 function Stepper({ currentStep, onStepClick }) {
     return (
         <div style={styles.stepperWrap}>
@@ -217,7 +217,7 @@ function MisueFloatingButton({ onClick, count }) {
                 zIndex: 200,
             }}
         >
-            Potential misuse of the AI System
+            Reasonably Foreseeable Misuse
             {count > 0 && (
                 <span style={{ background: '#4fc3f7', color: '#1a1a2e', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold' }}>
                     {count}
@@ -261,7 +261,7 @@ function MisuseModal({ misuses, setMisuses, likelihoodScale, impactScale, onClos
                     <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#666' }}>✕</button>
                 </div>
                 <p style={{ color: '#666', fontSize: '13px', marginBottom: '20px' }}>
-                    Reasonably foreseeable misuse - EU AI Act Art. 9(2)(b)<br />
+                    Reasonably foreseeable misuse - EU AI Act Article 9(2)(b)<br />
                     <em>You can add misuse scenarios at any point during the assessment.</em>
                 </p>
 
@@ -389,7 +389,7 @@ function LandingPage({ onStart, onResume }) {
 
     return (
         <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #dceaf5 0%, #c9dced 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-            <div style={{ maxWidth: '1000px', textAlign: 'center', color: COLORS.navy }}>
+            <div style={{ width: '100%', maxWidth: '1500px', textAlign: 'center', color: COLORS.navy }}>
                 <div style={{ fontSize: '13px', letterSpacing: '2px', color: '#1565c0', textTransform: 'uppercase', marginBottom: '16px', fontWeight: 'bold' }}>
                     EU AI Act · Article 9
                 </div>
@@ -400,7 +400,13 @@ function LandingPage({ onStart, onResume }) {
                     A structured risk management process for high-risk AI systems, grounded in ISO 31000:2018, ISO/IEC 23894:2023, NIST SP 800-30, and NIST AI RMF 1.0.
                 </p>
 
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '48px', flexWrap: 'wrap' }}>
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+                    gap: '12px',
+                    marginBottom: '48px',
+                    width: '100%'
+                }}>
                     {STEPS.map(step => (
                         <div key={step.id} style={{ background: 'white', border: `1px solid ${COLORS.cardBorder}`, borderRadius: '10px', padding: '14px 16px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                             <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#1565c0' }}>{step.label}</div>
@@ -452,7 +458,7 @@ function LandingPage({ onStart, onResume }) {
                                                 : pending.join(', ')
                                             return (
                                                 <div style={{ fontSize: '11px', color: '#6b7d94', textAlign: 'right', maxWidth: '260px', lineHeight: 1.5 }}>
-                                                    Stage: <strong style={{ color: '#1565c0' }}>{a.scope?.phase || '-'}</strong>
+                                                    Lifecycle Stage: <strong style={{ color: '#1565c0' }}>{a.scope?.phase || '-'}</strong>
                                                     {pending.length > 0 ? (
                                                         <div>Pending: {pendingLabel}</div>
                                                     ) : (
@@ -555,7 +561,7 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult, robustne
         const level = scoreToNistLevel(score)
         return {
             level,
-            reason: `The fairness test found a score of ${modelCheckResult.counterfactual_fairness} - meaning gender changed the AI's decision in a notable share of test cases.`,
+            reason: `The Counterfactual Fairness result indicates a score of ${modelCheckResult.counterfactual_fairness} - meaning gender changed the AI's decision in a notable share of test cases.`,
             impactHint: `Consider how severe the consequence would be for an affected applicant e.g. losing access to credit they were entitled to, based on a protected characteristic rather than their actual creditworthiness.`,
         }
     }
@@ -563,8 +569,8 @@ function getMetricSuggestion(riskId, modelCheckResult, occlusionResult, robustne
         const level = scoreToNistLevel(robustnessResult.flip_rate * 100)
         const pct = Math.round(robustnessResult.flip_rate * 100)
         const reason = robustnessResult.flip_rate === 0
-            ? `The robustness test found that the decision stayed the same across all differently formatted, but meaning-equivalent versions of the same applicant - suggesting the AI's output is reliable regardless of surface formatting in this test.`
-            : `The robustness test found that ${pct}% of differently formatted, but meaning-equivalent versions of the same applicant led to a different decision - suggesting the AI's output is not always reliable regardless of surface formatting.`
+            ? `The Robustness Check found that the decision stayed the same across all differently formatted, but meaning-equivalent versions of the same applicant - suggesting the AI's output is reliable regardless of surface formatting in this test.`
+            : `The Robustness Check found that ${pct}% of differently formatted, but meaning-equivalent versions of the same applicant led to a different decision - suggesting the AI's output is not always reliable regardless of surface formatting.`
         return {
             level,
             reason,
@@ -600,7 +606,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                     {activeView === 'extended' && 'Tested additional reformulated variants for robustness.'}
                     {activeView === 'occlusionAgg' && 'Checked several applicants instead of just one.'}
                     {activeView === 'robustness' && 'Tested whether differently formatted, but meaning-equivalent inputs change the decision.'}
-                    {activeView === 'original' && 'The first test result, from the Risk Identification step.'}
+                    {activeView === 'original' && 'The original AI Model Check results from Step 2.'}
                 </p>
 
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -635,7 +641,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                                 color: activeView === 'extended' ? 'white' : '#1a1a2e',
                             }}
                         >
-                            Extended Robustness
+                            Extended Robustness Check
                         </button>
                     )}
                     {occlusionAggregatedResult && ( //nur wenn occlusionAggregatedResult nicht null ist
@@ -659,14 +665,14 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                                 color: activeView === 'robustness' ? 'white' : '#1a1a2e',
                             }}
                         >
-                            Robustness
+                            Robustness Check
                         </button>
                     )}
                 </div>
 
                 {!modelCheckResult && !occlusionResult && (
                     <p style={{ color: '#aaa', fontSize: '13px', textAlign: 'center', marginTop: '40px' }}>
-                        No AI model check has been run yet.
+                        No AI Model Check has been run yet.
                     </p>
                 )}
 
@@ -720,7 +726,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                 {/*Occlusion Tabelle*/}
                 {activeView === 'original' && occlusionResult && (
                     <div>
-                        <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Occlusion (Applicant #{occlusionResult.applicant_id})</h3>
+                        <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Occlusion Test (Applicant #{occlusionResult.applicant_id})</h3>
                         <p style={{ fontSize: '13px', marginBottom: '10px' }}>
                             Baseline decision: <strong>{occlusionResult.baseline_decision}</strong>
                         </p>
@@ -807,7 +813,7 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                 {/*Robustness Ansicht*/}
                 {activeView === 'robustness' && robustnessResult && (
                     <div>
-                        <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Robustness / Consistency Check</h3>
+                        <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>Robustness Check</h3>
                         <p style={{ fontSize: '13px', marginBottom: '10px' }}>
                             Baseline decision: <strong>{robustnessResult.baseline_decision}</strong> · Flip probability: <strong>{Math.round(robustnessResult.flip_rate * 100)}%</strong>
                         </p>
@@ -931,15 +937,15 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
 
     return (
         <div style={styles.page}>
-            <h1 style={styles.heading}>Scope & Criteria</h1>
+            <h1 style={styles.heading}>Scope, Context & Criteria</h1>
             <p style={styles.sub}>Define the context of the AI system under assessment - ISO 31000 Cl. 6.3 · ISO/IEC 23894 Cl. 6.3</p>
 
             {/*Erneute Bewertung*/}
             {isReassessment && (
                 <div style={{ ...styles.card, marginBottom: '16px', background: '#fff8e1', border: '1px solid #f9a825' }}>
                     <p style={{ margin: 0, fontSize: '13px', color: '#8d6e00' }}>
-                        <strong>Re-assessment detected.</strong> This AI system was last assessed at lifecycle stage "<strong>{previousPhase}</strong>".
-                        The Domain typically stays the same across re-assessments of the same system. Please check below whether the
+                        <strong>Re-evaluation detected.</strong> This AI system was last assessed at lifecycle stage "<strong>{previousPhase}</strong>".
+                        The Domain typically stays the same across re-evaluations of the same system. Please check below whether the
                         <strong> Lifecycle Stage</strong> needs to be updated to reflect progress.
                     </p>
                 </div>
@@ -948,7 +954,7 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
             <div style={styles.card}>
                 <h3 style={{ marginTop: 0 }}>AI System Context</h3>
                 <label style={styles.label}>Deployment Domain</label>
-                <FieldHint text="Filters the risk catalog to risks relevant to your sector. Usually unchanged across re-assessments of the same system." />
+                <FieldHint text="Filters the risk catalog to risks relevant to your sector. Usually unchanged across re-evaluations of the same system." />
                 <select style={styles.input} value={form.domain} onChange={e => setForm({ ...form, domain: e.target.value })}>
                     <option value="">- Select Domain -</option>
                     {DOMAINS.map(d => <option key={d}>{d}</option>)}
@@ -975,13 +981,13 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
                 <label style={{ ...styles.label, fontSize: '15px', fontWeight: 'bold', color: COLORS.navy, marginTop: '8px' }}>
                     Lifecycle Stage
                 </label>
-                <FieldHint text="The Domain above usually stays the same across re-assessments - This is the field that changes as your AI system moves forward in its lifecycle (ISO/IEC 23894 Annex C)." />
+                <FieldHint text="The Domain above usually stays the same across re-evaluations - This is the field that changes as your AI system moves forward in its lifecycle (ISO/IEC 23894 Annex C)." />
                 <select
                     style={{ ...styles.input, borderColor: phaseUnchanged ? '#f9a825' : COLORS.accent }}
                     value={form.phase}
                     onChange={e => setForm({ ...form, phase: e.target.value })}
                 >
-                    <option value="">- Select Phase -</option>
+                    <option value="">- Select Lifecycle Stage -</option>
                     {PHASES.map(p => <option key={p}>{p}</option>)}
                 </select>
 
@@ -999,8 +1005,8 @@ function StepScope({ scope, setScope, likelihoodScale, setLikelihoodScale, impac
             </div>
 
             {/*Likelihood/Impact Tabellen*/}
-            <EditableScaleTable scale={likelihoodScale} setScale={setLikelihoodScale} title="Likelihood Scale" source="NIST SP 800-30 Table G-3" note="Used to assess the likelihood of each identified risk. Definitions can be adapted to organisational context." />
-            <EditableScaleTable scale={impactScale} setScale={setImpactScale} title="Impact Scale" source="NIST SP 800-30 Table H-3" note="Used to assess the impact of each identified risk. Definitions can be adapted to organisational context." />
+            <EditableScaleTable scale={likelihoodScale} setScale={setLikelihoodScale} title="Likelihood Scale" source="NIST SP 800-30 Table G-3" note="Used to assess the likelihood of each identified risk. Definitions can be adapted to organizational context." />
+            <EditableScaleTable scale={impactScale} setScale={setImpactScale} title="Impact Scale" source="NIST SP 800-30 Table H-3" note="Used to assess the impact of each identified risk. Definitions can be adapted to organizational context." />
 
             <NavButtons currentStep={1} onBack={() => {}} onNext={save} nextDisabled={!isValid} nextLabel="Save & Continue →" />
         </div>
@@ -1054,7 +1060,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
 
             <div style={{ background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px', padding: '12px 16px', marginBottom: '20px' }}>
                 <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
-                    <strong>These tests are optional, but recommended.</strong> Running them provides concrete evidence for the next step (Risk Identification). You can also continue without running any tests and assess risks based on judgment alone.
+                    <strong>These checks are optional, but recommended.</strong> Running them provides concrete evidence for the next step (Risk Identification). You can also continue without running any checks and assess risks based on judgment alone.
                 </p>
             </div>
             {resultsFromPreviousStage && modelCheckResult && (
@@ -1248,7 +1254,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                 onHeaderClick={() => section2Done && setActiveSection(3)}
             >
                 <div style={{ background: 'white', border: '1px solid #d6e8f5', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
-                    <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>Technical Check</h4>
+                    <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>Performance and Fairness Check</h4>
                     <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
                         Runs the connected AI system (Phi-3-mini via Ollama) against the selected applicant data
                         to measure Accuracy, Counterfactual Fairness, Precision, Recall, Specificity, and F1-Score.
@@ -1258,7 +1264,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                         disabled={modelCheckLoading || !readyForChecks}
                         style={{ ...styles.button, marginTop: 0, opacity: (modelCheckLoading || !readyForChecks) ? 0.6 : 1, cursor: (modelCheckLoading || !readyForChecks) ? 'not-allowed' : 'pointer' }}
                     >
-                        {modelCheckLoading ? 'Please wait, Running Test...' : 'Run AI Model Check'}
+                        {modelCheckLoading ? 'Please wait, Running Check...' : 'Run Performance and Fairness Check'}
                     </button>
 
                     {modelCheckError && (
@@ -1331,7 +1337,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                 </div>
 
                 <div style={{ background: 'white', border: '1px solid #d6e8f5', borderRadius: '8px', padding: '16px' }}>
-                    <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>Explainability Check (Occlusion)</h4>
+                    <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>Explainability Check (Occlusion Test)</h4>
                     <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
                         Removes one input field at a time from a single test applicant to see which features actually influence the model's decision.
                     </p>
@@ -1435,7 +1441,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                                     disabled={robustnessLoading || !readyForChecks || (dataSource === 'upload' && uploadedRows.length === 0)}
                                     style={{ ...styles.button, marginTop: 0, opacity: (robustnessLoading || !readyForChecks) ? 0.6 : 1, cursor: (robustnessLoading || !readyForChecks) ? 'not-allowed' : 'pointer' }}
                                 >
-                                    {robustnessLoading ? 'Please wait, Running Test...' : 'Run Robustness Test'}
+                                    {robustnessLoading ? 'Please wait, Running Check...' : 'Run Robustness Check'}
                                 </button>
                             </div>
 
@@ -1538,7 +1544,7 @@ function StepRiskIdentification({scope, risks, setRisks, assessmentId, onBack, o
             <h1 style={styles.heading}>Risk Identification</h1>
             <p style={styles.sub}>
                 {scope.domain
-                    ? `Showing risks for domain "${scope.domain}" · stage "${scope.phase}"`
+                    ? `Showing risks for domain "${scope.domain}" · lifecycle stage "${scope.phase}"`
                     : 'All catalog risks shown - no scope filter active.'}
             </p>
             {(modelCheckResult || occlusionResult) && (
@@ -2000,7 +2006,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
             }}>
                 <p style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', color: allGreen ? '#2e7d32' : '#e65100' }}>
                     {allGreen
-                        ? '🟢 All risks treated - you may proceed to the Report.'
+                        ? '🟢 All risks treated - you may proceed to Recording & Reporting.'
                         : `🟡 ${risks.filter(r => r.treatmentStatus !== 'confirmed').length} risk(s) still require treatment before you can proceed.`}
                 </p>
             </div>
@@ -2153,7 +2159,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                             {risk.id === 2 && simDone[risk.id] && occlusionAggregatedResult && (
                                                 <div style={{ background: '#e8f5e9', border: '1px solid #2e7d32', borderRadius: '6px', padding: '10px', marginBottom: '10px' }}>
                                                     <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#2e7d32', fontWeight: 'bold' }}>
-                                                        Ran Occlusion across {occlusionAggregatedResult.total_applicants_tested} applicants instead of one
+                                                        Ran the Occlusion Test across {occlusionAggregatedResult.total_applicants_tested} applicants instead of one
                                                     </p>
                                                     {(() => {
                                                         const maxRate = occlusionAggregatedResult.field_influence_summary[0]?.influential_rate || 0
@@ -2434,7 +2440,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                 onBack={onBack}
                 onNext={saveAndContinue}
                 nextDisabled={!allGreen}
-                nextLabel={allGreen ? 'Continue to Report →' : `${risks.filter(r => r.treatmentStatus !== 'confirmed').length} risk(s) remaining`}
+                nextLabel={allGreen ? 'Continue to Recording & Reporting →' : `${risks.filter(r => r.treatmentStatus !== 'confirmed').length} risk(s) remaining`}
             />
         </div>
     )
@@ -2463,7 +2469,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
 
         doc.setFontSize(10)
         doc.setFont('helvetica', 'normal')
-        doc.text('EU AI Act Art. 9 · Annex IV', 105, y, { align: 'center' })
+        doc.text('EU AI Act Article 9 · Annex IV', 105, y, { align: 'center' })
         y += 15
 
         //Trennlinie
@@ -2559,7 +2565,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
         doc.line(20, y, 190, y); y += 8
         doc.setFontSize(9)
         doc.setTextColor(150)
-        doc.text('Generated by RMS Microservice · EU AI Act Art. 9 Compliance Tool', 105, y, { align: 'center' }); y += 5
+        doc.text('Generated by RMS Microservice · EU AI Act Article 9 Risk Management Support Tool', 105, y, { align: 'center' }); y += 5
         doc.text('Note: In a production environment, this report would be transmitted to the Technical Documentation Microservice of the QMS.', 105, y, { align: 'center', maxWidth: 170 })
 
         doc.save(`RMS_Report_${user.aiSystemName}_${user.date}.pdf`)
@@ -2584,8 +2590,8 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
 
     return (
         <div style={styles.page}>
-            <h1 style={styles.heading}>Report</h1>
-            <p style={styles.sub}>Risk Assessment Documentation - EU AI Act Art. 9 · Annex IV</p>
+            <h1 style={styles.heading}>Recording & Reporting</h1>
+            <p style={styles.sub}>Risk Assessment Documentation - EU AI Act Article 9 · Annex IV</p>
 
             <div style={styles.card}>
                 <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '17px' }}>Assessment Info</h3>
