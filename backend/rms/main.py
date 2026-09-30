@@ -239,14 +239,14 @@ def get_or_compute(test_type: str, params: dict, compute_fn):
         return cached["result"]
 
     if DEMO_MODE:
-        print(f"[CACHE MISS - DEMO_MODE] {test_type} ({config_hash[:8]}...) - kein vorbereiteter Testlauf gefunden")
+        print(f"[CACHE MISS - DEMO_MODE] {test_type} ({config_hash[:8]}...) - no prepared test result found")
         raise HTTPException(
             status_code=409,
-            detail=f"Kein gecachtes Ergebnis für diese Konfiguration (test_type={test_type}). "
-                   f"Bitte diesen exakten Testlauf vorher einmal mit DEMO_MODE=false ausführen."
+            detail=f"No cached result found for this configuration (test_type={test_type}). "
+                   f"Please run this exact test configuration once with DEMO_MODE=false first."
         )
 
-    print(f"[LIVE CALL] {test_type} ({config_hash[:8]}...) - führe echten Test aus")
+    print(f"[LIVE CALL] {test_type} ({config_hash[:8]}...) - run a real test")
     result = compute_fn()
     cached_test_results_collection.update_one(
         {"config_hash": config_hash},
@@ -333,11 +333,15 @@ class AssessmentUpdate(BaseModel):
     model_check_result: Optional[Any] = None
     occlusion_result: Optional[Any] = None
     robustness_result: Optional[Any] = None
+    mitigated_result: Optional[Any] = None
+    extended_validation_result: Optional[Any] = None
+    occlusion_aggregated_result: Optional[Any] = None
     data_source: Optional[str] = None
     custom_prompt: Optional[str] = None
     positive_label: Optional[str] = None
     negative_label: Optional[str] = None
     uploaded_rows: Optional[List[Any]] = None
+    assessor_notes: Optional[str] = None
 
 
 # MongoDB nutzt intern ein spezielles ObjectId-Format, das JSON nicht direkt
@@ -589,7 +593,7 @@ async def upload_applicants(
         negative_label: str = Form("rejected"),
 ):
     if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Nur CSV-Dateien werden unterstützt.")
+        raise HTTPException(status_code=400, detail="Only CSV files are supported.")
 
     content = await file.read()
     text = content.decode("utf-8")
@@ -599,18 +603,18 @@ async def upload_applicants(
     if custom_prompt:
         #Freier Modus: nur ground_truth ist zwingend erforderlich
         if "ground_truth" not in fieldnames:
-            raise HTTPException(status_code=400, detail="Fehlende Spalte: ground_truth")
+            raise HTTPException(status_code=400, detail="Missing column: ground_truth")
         if len(fieldnames) < 2:
-            raise HTTPException(status_code=400, detail="Die Datei benötigt mindestens eine Datenspalte zusätzlich zu ground_truth.")
+            raise HTTPException(status_code=400, detail="The file requires at least one data column in addition to ground_truth.")
     else:
         #Fester Finance-Modus: alle bekannten Spalten müssen vorhanden sein
         missing_columns = [col for col in REQUIRED_COLUMNS if col not in fieldnames]
         if missing_columns:
-            raise HTTPException(status_code=400, detail=f"Fehlende Spalten: {', '.join(missing_columns)}")
+            raise HTTPException(status_code=400, detail=f"Missing columns: {', '.join(missing_columns)}")
 
     applicants = list(reader)
     if not applicants:
-        raise HTTPException(status_code=400, detail="Die Datei enthält keine Datensätze.")
+        raise HTTPException(status_code=400, detail="The file contains no data rows.")
 
     metrics = compute_credit_metrics_for(
         applicants,
@@ -642,7 +646,6 @@ async def credit_metrics(payload: dict = None):
 
 
 #Wiederholt denselben Test, aber ohne "gender" im Prompt
-#(IEEE Std 3198-2025, Cl. 6.2.1.9), simuliert eine Bias-Mitigation-Maßnahme
 @app.post("/credit-metrics-mitigated")
 async def credit_metrics_mitigated(payload: dict = None):
     payload = payload or {}
@@ -985,11 +988,15 @@ def create_assessment(payload: AssessmentCreate):
         "model_check_result": None,
         "occlusion_result": None,
         "robustness_result": None,
+        "mitigated_result": None,
+        "extended_validation_result": None,
+        "occlusion_aggregated_result": None,
         "data_source":None,
         "custom_prompt":None,
         "positive_label":None,
         "negative_label":None,
-        "uploaded_rows":None
+        "uploaded_rows":None,
+        "assessor_notes": None
     }
     result = assessments_collection.insert_one(doc)
     doc["_id"] = result.inserted_id

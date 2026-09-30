@@ -53,7 +53,7 @@ const RISK_CATALOG = [
     { id: 16, title: 'Disinformation and manipulation at scale', description: 'AI systems are used to generate and spread false information or to manipulate affected individuals at scale.', source: 'MIT AI Risk Repository, Subdomain 4.1', domains: ['Law Enforcement', 'Education', 'HR & Recruitment'], phases: ['Deployment', 'Operation and Monitoring'] },
     { id: 17, title: 'Loss of human agency in automated decisions', description: 'Affected persons progressively lose the ability to understand, contest, or influence decisions made by AI systems.', source: 'MIT AI Risk Repository, Subdomain 5.2', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
     { id: 18, title: 'Prompt injection and model behavior manipulation', description: 'Malicious inputs exploit LLM inference to override intended behavior and produce harmful or unintended outputs.', source: 'IBM AI Risk Atlas: Prompt attacks; Model-behavior manipulation; MIT AI Risk Repository, Subdomain 2.2', domains: ['Finance', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
-    { id: 19, title: 'Lack of AI governance and legal accountability', description: 'Absent or insufficient ownership, accountability, and documentation structures hinder compliance verification and auditing.', source: 'IBM AI Risk Atlas: Governance; MIT AI Risk Repository, Subdomain 6.5', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Deployment', 'Operation and Monitoring'] },
+    { id: 19, title: 'Lack of AI governance and legal accountability', description: 'Absent or insufficient ownership, accountability, and documentation structures hinder compliance verification and auditing.', source: 'IBM AI Risk Atlas: Governance; MIT AI Risk Repository, Subdomain 6.5; ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Deployment', 'Operation and Monitoring', , 'Retirement or Replacement'] },
 ]
 
 //Scope & Criteria
@@ -494,10 +494,10 @@ function interpretAccuracy(accuracy) {
 function interpretFairness(cf) {
     const threshold = 0.1
     if (cf <= threshold) {
-        return `This is a low value, meaning gender did not change the outcome very often in this test. Based on a comparable published example, this would count as an acceptable result.`
+        return `This is a low value, meaning gender did not change the outcome very often in this test. It is below the prototype-specific threshold used for decision support.`
     }
     const multiple = (cf / threshold).toFixed(1)
-    return `For some applicants, changing only their gender changed the AI's decision. This is ${multiple}x higher than what a comparable published example (IEEE Std 3198-2025, Cl. 7.3.1) treats as acceptable, so this points to a fairness problem.`}
+    return `For some applicants, changing only their gender changed the AI's decision. The result exceeds the prototype-specific threshold used for decision support and therefore indicates a potential fairness concern.`}
 
 //Precision interpretieren
 function interpretPrecision(precision) {
@@ -524,15 +524,53 @@ function interpretF1(f1) {
 }
 
 //Einfacher CSV-Parser für hochgeladene Antragsteller-Dateien (erwartet Komma-getrennt, erste Zeile = Header)
+function parseCSVLine(line) {
+    const values = []
+    let current = ''
+    let inQuotes = false
+
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+
+        if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                current += '"'
+                i++
+            } else {
+                inQuotes = !inQuotes
+            }
+        } else if (char === ',' && !inQuotes) {
+            values.push(current.trim())
+            current = ''
+        } else {
+            current += char
+        }
+    }
+
+    values.push(current.trim())
+    return values
+}
+
 function parseCSV(text) {
-    const lines = text.trim().split('\n')
-    const headers = lines[0].split(',').map(h => h.trim())
+    const lines = text
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n')
+        .filter(line => line.trim() !== '')
+
+    if (lines.length === 0) return []
+
+    const headers = parseCSVLine(lines[0]).map(h => h.trim())
+
     return lines.slice(1).map(line => {
-        //Einfaches Split reicht hier, da unsere CSVs keine Kommas innerhalb von Feldern enthalten (außer ggf. in Anführungszeichen)
-        const matches = line.match(/(".*?"|[^",]+)(?=,|$)/g) || []
-        const values = matches.map(v => v.replace(/^"|"$/g, '').trim())
+        const values = parseCSVLine(line)
         const row = {}
-        headers.forEach((h, i) => { row[h] = values[i] ?? 'n/a' })
+
+        headers.forEach((header, i) => {
+            const value = values[i] ?? ''
+            row[header] = value.trim() === '' ? 'n/a' : value.trim()
+        })
+
         return row
     })
 }
@@ -555,7 +593,7 @@ function scoreToNistLevel(score) {
 //Ordnet genau drei Risiken (per ID) eine Metrik zu und leitet daraus einen Likelihood/Impact-Vorschlag ab
 function getMetricSuggestion(riskId, modelCheckResult, occlusionResult, robustnessResult) {
     if (riskId === 10 && modelCheckResult && modelCheckResult.counterfactual_fairness !== null && modelCheckResult.counterfactual_fairness !== undefined) {
-        //IEEE Std 3198-2025 Cl. 7.3.1 setzt die Akzeptanzschwelle bei 0.1, nicht bei 0 - deshalb skalieren relativ zu dieser Schwelle, bevor NIST-Bins anwenden
+        //Akzeptanzschwelle bei 0.1, nicht bei 0 - deshalb skalieren relativ zu dieser Schwelle, bevor NIST-Bins anwenden
         const FAIRNESS_ACCEPTABLE_THRESHOLD = 0.1
         const score = (modelCheckResult.counterfactual_fairness / FAIRNESS_ACCEPTABLE_THRESHOLD) * 20
         const level = scoreToNistLevel(score)
@@ -684,11 +722,28 @@ function AIModelCheckPanel({ modelCheckResult, occlusionResult, robustnessResult
                                 <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{Math.round(displayedResult.accuracy * 100)}%</div>
                                 <p style={{ fontSize: '12px', color: '#5a5a5a', marginTop: '8px' }}>{interpretAccuracy(displayedResult.accuracy)}</p>
                             </div>
-                            <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-                                <div style={{ fontSize: '12px', color: '#5a5a5a' }}>Counterfactual Fairness</div>
-                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: displayedResult.counterfactual_fairness > 0.1 ? '#c62828' : '#2e7d32' }}>{displayedResult.counterfactual_fairness}</div>
-                                <p style={{ fontSize: '12px', color: '#5a5a5a', marginTop: '8px' }}>{interpretFairness(displayedResult.counterfactual_fairness)}</p>
-                            </div>
+                            {displayedResult.counterfactual_fairness !== null &&
+                                displayedResult.counterfactual_fairness !== undefined && (
+                                    <div style={{ padding: '14px', background: '#fafafa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                                        <div style={{ fontSize: '12px', color: '#5a5a5a' }}>
+                                            Counterfactual Fairness
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: '24px',
+                                                fontWeight: 'bold',
+                                                color: displayedResult.counterfactual_fairness > 0.1
+                                                    ? '#c62828'
+                                                    : '#2e7d32'
+                                            }}
+                                        >
+                                            {displayedResult.counterfactual_fairness}
+                                        </div>
+                                        <p style={{ fontSize: '12px', color: '#5a5a5a', marginTop: '8px' }}>
+                                            {interpretFairness(displayedResult.counterfactual_fairness)}
+                                        </p>
+                                    </div>
+                                )}
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '20px' }}>
@@ -1139,9 +1194,9 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                         />
                         <p style={{ fontSize: '12px', color: '#666', margin: '4px 0 0', lineHeight: 1.6 }}>
                             {isFinance ? (
-                                <>Your CSV can use the standard columns (age, gender, income, employment, existing_debt, requested_amount, application_type, loan_goal), or any custom columns you like - as long as it has a <strong>ground_truth</strong> column.</>
+                                <>Your CSV can use the standard columns (age, gender, income, employment, existing_debt, requested_amount, application_type, loan_goal), or any custom columns you like. A <strong>ground_truth</strong> column is required for the Classification Performance metrics. The Explainability and Robustness Checks can also be run without ground-truth labels.</>
                             ) : (
-                                <>Your CSV file can use any column names you like (e.g. "years_of_experience", "test_score"), as long as it has a <strong>ground_truth</strong> column with the correct answer for each row.</>
+                                <>Your CSV file can use any column names you like (e.g. "years_of_experience", "test_score"). A <strong>ground_truth</strong> column containing the correct outcome for each row is required for the Classification Performance metrics. The Explainability and Robustness Checks can also be run without ground-truth labels.</>
                             )}
                         </p>
                         {hasUploadedData && (
@@ -1330,7 +1385,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                     {modelCheckResult && modelCheckResult.unclear_count > 0 && (
                         <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px' }}>
                             <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
-                                {modelCheckResult.unclear_count} response(s) could not be clearly classified and were excluded from Precision/Recall/Specificity/F1.
+                                {modelCheckResult.unclear_count} response(s) could not be clearly classified. They count as incorrect for Accuracy and were excluded from Precision, Recall, Specificity, and F1.
                             </p>
                         </div>
                     )}
@@ -1339,7 +1394,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                 <div style={{ background: 'white', border: '1px solid #d6e8f5', borderRadius: '8px', padding: '16px' }}>
                     <h4 style={{ margin: '0 0 8px', fontSize: '14px' }}>Explainability Check (Occlusion Test)</h4>
                     <p style={{ fontSize: '13px', color: '#5a5a5a', marginBottom: '12px' }}>
-                        Removes one input field at a time from a single test applicant to see which features actually influence the model's decision.
+                        Removes one input field at a time from a single test applicant to see which features the model's decision is sensitive to when they are omitted.
                     </p>
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
                         <label style={{ ...styles.label, marginBottom: 0 }}>Test applicant:</label>
@@ -1383,7 +1438,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                                     const influential = occlusionResult.occlusion_results.filter(r => r.changed_from_baseline).map(r => r.omitted_field)
                                     return influential.length === 0
                                         ? "No single field changed the decision when removed - the model's decision appears to rely on the combination of all fields together, or is not clearly sensitive to any one feature in this test."
-                                        : `The decision changed when removing: ${influential.join(', ')}. This suggests these fields carry the most weight in this specific case.`
+                                        : `The decision changed when removing: ${influential.join(', ')}. This suggests that the model's decision is particularly sensitive to these fields in this specific case.`
                                 })()}
                             </p>
                             <table style={styles.table}>
@@ -1401,7 +1456,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                                         <td style={styles.td}>{r.decision_without_field}</td>
                                         <td style={styles.td}>
                                             {r.changed_from_baseline ? (
-                                                <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes - influential</span>
+                                                <span style={{ color: '#c62828', fontWeight: 'bold' }}>Yes - decision changed</span>
                                             ) : (
                                                 <span style={{ color: '#999' }}>No</span>
                                             )}
@@ -1957,7 +2012,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
         setRisks(risks.map(r => r.id !== id ? r : {
             ...r,
             treatmentOption: 'Retain the risk by informed decision',
-            treatmentNote: 'Risk was already assessed as Low/Very Low; accepted without further treatment (ISO 31000 Cl. 6.5.1).',
+            treatmentNote: 'Risk was already assessed as Low/Very Low; accepted without further treatment (ISO 31000 Cl. 6.5.2).',
             residualLikelihood: r.likelihood,
             residualImpact: r.impact,
             residualLevel: r.level,
@@ -1971,7 +2026,13 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
             await fetch(`http://127.0.0.1:8000/assessments/${assessmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ current_step: 6, risks: risks }),
+                body: JSON.stringify({
+                    current_step: 6,
+                    risks: risks,
+                    mitigated_result: mitigatedResult,
+                    extended_validation_result: extendedValidationResult,
+                    occlusion_aggregated_result: occlusionAggregatedResult,
+                }),
             })
         } catch (error) {
             console.error('Failed to save treatment step:', error)
@@ -2448,7 +2509,9 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
 
 //Report Seite
 function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinish, assessorNotes, setAssessorNotes }) {
-    const high = risks.filter(r => r.level === 'High' || r.level === 'Very High').length
+    const high = risks.filter(
+        r => r.residualLevel === 'High' || r.residualLevel === 'Very High'
+    ).length
 
     const [downloading, setDownloading] = useState(false)
     const [downloaded, setDownloaded] = useState(false)
@@ -2469,7 +2532,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
 
         doc.setFontSize(10)
         doc.setFont('helvetica', 'normal')
-        doc.text('EU AI Act Article 9 · Annex IV', 105, y, { align: 'center' })
+        doc.text('EU AI Act Article 9 · Risk Assessment Report', 105, y, { align: 'center' })
         y += 15
 
         //Trennlinie
@@ -2645,7 +2708,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
                         </div>
                         <div>
                             <div style={{ fontSize: '20px', fontWeight: 'bold', color: high > 0 ? '#c62828' : '#2e7d32' }}>{high}</div>
-                            <div style={{ fontSize: '13px', color: '#5a5a5a' }}>High / Very High Risks</div>
+                            <div style={{ fontSize: '13px', color: '#5a5a5a' }}>High / Very High Residual Risks</div>
                         </div>
                         <div>
                             <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1a1a2e' }}>{misuses.length}</div>
@@ -2776,9 +2839,18 @@ export default function App() {
     //AI Test - nutzt je nach dataSource entweder die eingebauten Testdaten oder eine hochgeladene Datei
     //Bei Domain != Finance wird zusätzlich customPrompt + die Labels mitgeschickt
     async function runModelCheck() {
+
+        if (dataSource === 'upload' && !uploadedFile) {
+            setModelCheckError(
+                'Please re-select the CSV file before rerunning the Checks.'
+            )
+            return
+        }
+
         setResultsFromPreviousStage(false)
         setModelCheckLoading(true)
         setModelCheckError(null)
+
         try {
             let response
             if (dataSource === 'upload' && uploadedFile) {
@@ -2955,12 +3027,22 @@ export default function App() {
         setModelCheckResult(assessment.model_check_result || null)
         setOcclusionResult(assessment.occlusion_result || null)
         setRobustnessResult(assessment.robustness_result || null)
+        setMitigatedResult(
+            isReassessment ? null : (assessment.mitigated_result || null)
+        )
+        setExtendedValidationResult(
+            isReassessment ? null : (assessment.extended_validation_result || null)
+        )
+        setOcclusionAggregatedResult(
+            isReassessment ? null : (assessment.occlusion_aggregated_result || null)
+        )
         setResultsFromPreviousStage(isReassessment && !!assessment.model_check_result)
         setDataSource(assessment.data_source || null)
         setCustomPrompt(assessment.custom_prompt || '')
         setPositiveLabel(assessment.positive_label || '')
         setNegativeLabel(assessment.negative_label || '')
         setUploadedRows(assessment.uploaded_rows || [])
+        setAssessorNotes(assessment.assessor_notes || '')
     }
 
     function renderStep() {
@@ -3055,11 +3137,15 @@ export default function App() {
                 model_check_result: modelCheckResult,
                 occlusion_result: occlusionResult,
                 robustness_result: robustnessResult,
+                mitigated_result: mitigatedResult,
+                extended_validation_result: extendedValidationResult,
+                occlusion_aggregated_result: occlusionAggregatedResult,
                 data_source: dataSource,
                 custom_prompt: customPrompt,
                 positive_label: positiveLabel,
                 negative_label: negativeLabel,
                 uploaded_rows: uploadedRows,
+                assessor_notes: assessorNotes
             }),
         })
     }
