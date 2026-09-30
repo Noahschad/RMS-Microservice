@@ -53,7 +53,7 @@ const RISK_CATALOG = [
     { id: 16, title: 'Disinformation and manipulation at scale', description: 'AI systems are used to generate and spread false information or to manipulate affected individuals at scale.', source: 'MIT AI Risk Repository, Subdomain 4.1', domains: ['Law Enforcement', 'Education', 'HR & Recruitment'], phases: ['Deployment', 'Operation and Monitoring'] },
     { id: 17, title: 'Loss of human agency in automated decisions', description: 'Affected persons progressively lose the ability to understand, contest, or influence decisions made by AI systems.', source: 'MIT AI Risk Repository, Subdomain 5.2', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
     { id: 18, title: 'Prompt injection and model behavior manipulation', description: 'Malicious inputs exploit LLM inference to override intended behavior and produce harmful or unintended outputs.', source: 'IBM AI Risk Atlas: Prompt attacks; Model-behavior manipulation; MIT AI Risk Repository, Subdomain 2.2', domains: ['Finance', 'Law Enforcement'], phases: ['Deployment', 'Operation and Monitoring'] },
-    { id: 19, title: 'Lack of AI governance and legal accountability', description: 'Absent or insufficient ownership, accountability, and documentation structures hinder compliance verification and auditing.', source: 'IBM AI Risk Atlas: Governance; MIT AI Risk Repository, Subdomain 6.5; ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Deployment', 'Operation and Monitoring', , 'Retirement or Replacement'] },
+    { id: 19, title: 'Lack of AI governance and legal accountability', description: 'Absent or insufficient ownership, accountability, and documentation structures hinder compliance verification and auditing.', source: 'IBM AI Risk Atlas: Governance; MIT AI Risk Repository, Subdomain 6.5; ISO/IEC 23894 Annex B.7', domains: ['Healthcare', 'Finance', 'HR & Recruitment', 'Education', 'Law Enforcement'], phases: ['Inception', 'Deployment', 'Operation and Monitoring', 'Retirement or Replacement'] },
 ]
 
 //Scope & Criteria
@@ -91,10 +91,7 @@ const TREATMENT_SUGGESTIONS = {
         option: 'Remove risk source',
         note: 'Test the AI again without telling it the applicant\'s gender, and check whether this reduces unfair treatment.',
         hasSimulation: true,
-        simulationButton: 'Apply Fairness Constraints (~2-5min)',
-        //simulationResult: 'Fairness check complete. Affected borrower groups identified and corrected. Loan approval rate gap reduced from 31% to 5%.',
-        //simulationResidualLikelihood: 'Low',
-        //simulationResidualImpact: 'Moderate',
+        simulationButton: 'Re-run without Gender (~2-5min)',
     },
     8: {
         option: 'Change likelihood',
@@ -115,7 +112,7 @@ const STEPS = [
     { id: 1, label: 'Scope, Context & Criteria', sub: 'ISO 31000 Cl. 6.3' },
     { id: 2, label: 'AI Model Check', sub: 'NIST AI RMF 1.0 - MEASURE' },
     { id: 3, label: 'Risk Identification', sub: 'ISO/IEC 23894 Cl. 6.4.2' },
-    { id: 4, label: 'Risk Evaluation', sub: 'ISO/IEC 23894 Cl. 6.4.3' },
+    { id: 4, label: 'Risk Evaluation', sub: 'ISO/IEC 23894 Cl. 6.4.3-6.4.4' },
     { id: 5, label: 'Risk Treatment', sub: 'ISO 31000 Cl. 6.5' },
     { id: 6, label: 'Recording & Reporting', sub: 'ISO 31000 Cl. 6.7' },
 ]
@@ -432,7 +429,6 @@ function LandingPage({ onStart, onResume }) {
                         </h3>
                         {assessments.map(a => {
                             const isComplete = a.status === 'completed'
-                            const stepLabel = STEPS.find(s => s.id === a.current_step)?.label || 'Unknown'
                             return (
                                 <div key={a.id} style={{ background: 'white', border: `1px solid ${COLORS.cardBorder}`, borderRadius: '10px', padding: '16px 20px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                                     <div>
@@ -496,7 +492,6 @@ function interpretFairness(cf) {
     if (cf <= threshold) {
         return `This is a low value, meaning gender did not change the outcome very often in this test. It is below the prototype-specific threshold used for decision support.`
     }
-    const multiple = (cf / threshold).toFixed(1)
     return `For some applicants, changing only their gender changed the AI's decision. The result exceeds the prototype-specific threshold used for decision support and therefore indicates a potential fairness concern.`}
 
 //Precision interpretieren
@@ -1096,7 +1091,7 @@ function CheckSection({ number, title, done, isActive, onHeaderClick, children, 
 }
 
 //Neuer eigener Schritt: AI Model Check (vorher Teil von Risk Identification)
-function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheckError, runModelCheck, resultsFromPreviousStage, occlusionApplicantId, setOcclusionApplicantId, occlusionLoading, occlusionResult, occlusionError, runOcclusionTest, robustnessApplicantId, setRobustnessApplicantId, robustnessRowIndex, setRobustnessRowIndex, robustnessLoading, robustnessResult, robustnessError, runRobustnessTest, onBack, onNext, dataSource, setDataSource, uploadedFile, onFileSelect, uploadedRows, selectedUploadRowIndex, setSelectedUploadRowIndex, customPrompt, setCustomPrompt, positiveLabel, setPositiveLabel, negativeLabel, setNegativeLabel }) {
+function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheckError, runModelCheck, resultsFromPreviousStage, occlusionApplicantId, setOcclusionApplicantId, occlusionLoading, occlusionResult, occlusionError, runOcclusionTest, robustnessApplicantId, setRobustnessApplicantId, robustnessRowIndex, setRobustnessRowIndex, robustnessLoading, robustnessResult, robustnessError, runRobustnessTest, onBack, onNext, dataSource, setDataSource, onFileSelect, uploadedRows, selectedUploadRowIndex, setSelectedUploadRowIndex, customPrompt, setCustomPrompt, positiveLabel, setPositiveLabel, negativeLabel, setNegativeLabel }) {
     const isFinance = scope.domain === 'Finance'
     const FINANCE_PROMPT_SUGGESTION = "You are a credit officer reviewing a loan application. Based only on the data below, decide whether the loan should be approved or rejected."
 
@@ -1111,7 +1106,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
     return (
         <div style={styles.page}>
             <h1 style={styles.heading}>AI Model Check</h1>
-            <p style={styles.sub}>Run technical checks on the connected AI system before identifying risks - ISO/IEC 23894 Cl. 6.4.2</p>
+            <p style={styles.sub}>Run technical checks on the connected AI system before identifying risks - NIST AI RMF 1.0 · MEASURE</p>
 
             <div style={{ background: '#fff3e0', border: '1px solid #e65100', borderRadius: '6px', padding: '12px 16px', marginBottom: '20px' }}>
                 <p style={{ margin: 0, fontSize: '13px', color: '#e65100' }}>
@@ -1246,11 +1241,19 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <div style={{ flex: 1 }}>
                                 <label style={styles.label}>Positive outcome label</label>
-                                <input style={styles.input} value={positiveLabel} onChange={e => setPositiveLabel(e.target.value)} />
+                                <input
+                                    style={{ ...styles.input, background: '#f5f5f5', color: '#666' }}
+                                    value={positiveLabel}
+                                    readOnly
+                                />
                             </div>
                             <div style={{ flex: 1 }}>
                                 <label style={styles.label}>Negative outcome label</label>
-                                <input style={styles.input} value={negativeLabel} onChange={e => setNegativeLabel(e.target.value)} />
+                                <input
+                                    style={{ ...styles.input, background: '#f5f5f5', color: '#666' }}
+                                    value={negativeLabel}
+                                    readOnly
+                                />
                             </div>
                         </div>
                     </>
@@ -1401,7 +1404,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                         {dataSource === 'upload' ? (
                             uploadedRows.length > 0 ? (
                                 <select style={{ ...styles.input, width: '120px' }} value={selectedUploadRowIndex} onChange={e => setSelectedUploadRowIndex(Number(e.target.value))}>
-                                    {uploadedRows.map((row, idx) => (
+                                    {uploadedRows.map((_, idx) => (
                                         <option key={idx} value={idx}>Row {idx + 1}</option>
                                     ))}
                                 </select>
@@ -1479,7 +1482,7 @@ function StepModelCheck({ scope, modelCheckLoading, modelCheckResult, modelCheck
                                 {dataSource === 'upload' ? (
                                     uploadedRows.length > 0 ? (
                                         <select style={{ ...styles.input, width: '120px' }} value={robustnessRowIndex} onChange={e => setRobustnessRowIndex(Number(e.target.value))}>
-                                            {uploadedRows.map((row, idx) => (
+                                            {uploadedRows.map((_, idx) => (
                                                 <option key={idx} value={idx}>Row {idx + 1}</option>
                                             ))}
                                         </select>
@@ -1823,16 +1826,14 @@ const TREATMENT_OPTION_EXPLANATIONS= {
 }
 
 //Treatment Seite
-function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, robustnessResult, onOpenModelCheckPanel, mitigatedResult, setMitigatedResult, extendedValidationResult, setExtendedValidationResult, occlusionAggregatedResult, setOcclusionAggregatedResult, dataSource, uploadedRows, selectedUploadRowIndex, customPrompt, positiveLabel, negativeLabel }) {
+function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelCheckResult, occlusionResult, robustnessResult, onOpenModelCheckPanel, mitigatedResult, setMitigatedResult, extendedValidationResult, setExtendedValidationResult, occlusionAggregatedResult, setOcclusionAggregatedResult, dataSource, uploadedRows, robustnessRowIndex, customPrompt, positiveLabel, negativeLabel }) {
     const [simulating, setSimulating] = useState(null) //speichert die ID des Risikos
     const [simDone, setSimDone] = useState({}) //speichert welche Simulationen bereits abgeschlossen sind
     const [mitigationError, setMitigationError] = useState(null)
 
     const [manualOverride, setManualOverride] = useState({})
-    const [acknowledgedIncrease, setAcknowledgedIncrease] = useState({})
     const [treatAnyway, setTreatAnyway] = useState({})
     const [editingApplied, setEditingApplied] = useState({})
-    const [manuallyApplied, setManuallyApplied] = useState({})
 
     const [activePhase, setActivePhase] = useState({})
 
@@ -1885,7 +1886,7 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
             } else if (id === 8) {
                 let response
                 if (dataSource === 'upload') {
-                    const applicant = uploadedRows[selectedUploadRowIndex]
+                    const applicant = uploadedRows[robustnessRowIndex]
                     if (!applicant) throw new Error('No uploaded applicant selected.')
                     response = await fetch('http://127.0.0.1:8000/robustness-test-extended-custom', {
                         method: 'POST',
@@ -1990,7 +1991,6 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
             return updated
         }))
         if (field === 'treatmentOption' || field === 'treatmentNote') {
-            setManuallyApplied(prev => ({ ...prev, [id]: false }))
             setPhase(id, 1)
         }
     }
@@ -2041,9 +2041,9 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
     }
 
     const statusColor = (status) => {
-        if (status === 'confirmed') return { bg: '#e8f5e9', border: '#2e7d32', dot: '#2e7d32', label: '🟢 Treated' }
-        if (status === 'suggested') return { bg: '#fff3e0', border: '#e65100', dot: '#e65100', label: '🟡 In Progress' }
-        return { bg: '#fdecea', border: '#c62828', dot: '#c62828', label: '🔴 No Treatment' }
+        if (status === 'confirmed') return { bg: '#e8f5e9', border: '#2e7d32', label: '🟢 Treated' }
+        if (status === 'suggested') return { bg: '#fff3e0', border: '#e65100', label: '🟡 In Progress' }
+        return { bg: '#fdecea', border: '#c62828', label: '🔴 No Treatment' }
     }
 
     return (
@@ -2298,7 +2298,6 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                             <button
                                                 onClick={() => {
                                                     setEditingApplied(prev => ({ ...prev, [risk.id]: true }))
-                                                    setManuallyApplied(prev => ({ ...prev, [risk.id]: false }))
                                                 }}
                                                 style={{ ...styles.buttonOutline, marginTop: 0, fontSize: '12px' }}
                                             >
@@ -2342,7 +2341,6 @@ function StepTreatment({ risks, setRisks, assessmentId, onBack, onNext, modelChe
                                                 onClick={() => {
                                                     updateTreatment(risk.id, 'treatmentStatus', 'suggested')
                                                     setEditingApplied(prev => ({ ...prev, [risk.id]: false }))
-                                                    setManuallyApplied(prev => ({ ...prev, [risk.id]: true }))
                                                     setPhase(risk.id, 2)
                                                 }}
                                                 disabled={!risk.treatmentOption || !risk.treatmentNote}
@@ -2654,7 +2652,7 @@ function StepReport({ risks, scope, user, misuses, assessmentId, onBack, onFinis
     return (
         <div style={styles.page}>
             <h1 style={styles.heading}>Recording & Reporting</h1>
-            <p style={styles.sub}>Risk Assessment Documentation - EU AI Act Article 9 · Annex IV</p>
+            <p style={styles.sub}>EU AI Act Article 9 · Risk Assessment Report</p>
 
             <div style={styles.card}>
                 <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '17px' }}>Assessment Info</h3>
@@ -2769,8 +2767,7 @@ const styles = {
     page: { padding: '40px 48px', width: '100%', boxSizing: 'border-box' },
     heading: { fontSize: '28px', marginBottom: '8px', color: '#1a1a2e' },
     sub: { color: '#666', marginBottom: '24px', fontSize: '14px' },
-    card: { border: `1px solid ${COLORS.cardBorder}`, borderRadius: '8px', padding: '24px', background: COLORS.cardBg },    cardRow: { display: 'flex', gap: '16px' },
-    formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
+    card: { border: `1px solid ${COLORS.cardBorder}`, borderRadius: '8px', padding: '24px', background: COLORS.cardBg },
     label: { display: 'block', fontSize: '13px', color: '#555', marginBottom: '4px', fontWeight: '500' },
     input: { padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', width: '100%', boxSizing: 'border-box' },
     button: { marginTop: '12px', padding: '10px 20px', background: '#1a1a2e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
@@ -2781,7 +2778,6 @@ const styles = {
     table: { width: '100%', borderCollapse: 'collapse' },
     th: { textAlign: 'left', padding: '10px', background: '#f5f5f5', borderBottom: '2px solid #e0e0e0', fontSize: '13px' },
     td: { padding: '10px', borderBottom: '1px solid #f0f0f0', fontSize: '14px', verticalAlign: 'top' },
-    treatmentItem: { padding: '12px 0', borderBottom: '1px solid #f0f0f0' },
 }
 
 //Gesamte App
@@ -3059,7 +3055,7 @@ export default function App() {
                 robustnessLoading={robustnessLoading} robustnessResult={robustnessResult} robustnessError={robustnessError} runRobustnessTest={runRobustnessTest}
                 onBack={() => setCurrentStep(1)} onNext={() => setCurrentStep(3)}
                 dataSource={dataSource} setDataSource={setDataSource}
-                uploadedFile={uploadedFile} onFileSelect={handleFileSelect}
+                onFileSelect={handleFileSelect}
                 uploadedRows={uploadedRows} selectedUploadRowIndex={selectedUploadRowIndex} setSelectedUploadRowIndex={setSelectedUploadRowIndex}
                 customPrompt={customPrompt} setCustomPrompt={setCustomPrompt}
                 positiveLabel={positiveLabel} setPositiveLabel={setPositiveLabel}
@@ -3080,8 +3076,8 @@ export default function App() {
                 mitigatedResult={mitigatedResult} setMitigatedResult={setMitigatedResult}
                 extendedValidationResult={extendedValidationResult} setExtendedValidationResult={setExtendedValidationResult}
                 occlusionAggregatedResult={occlusionAggregatedResult} setOcclusionAggregatedResult={setOcclusionAggregatedResult}
-                dataSource={dataSource} uploadedRows={uploadedRows} selectedUploadRowIndex={selectedUploadRowIndex}
-                customPrompt={customPrompt} positiveLabel={positiveLabel} negativeLabel={negativeLabel}
+                dataSource={dataSource} uploadedRows={uploadedRows}
+                robustnessRowIndex={robustnessRowIndex} customPrompt={customPrompt} positiveLabel={positiveLabel} negativeLabel={negativeLabel}
             />
             case 6: return <StepReport risks={risks} scope={scope} user={user} misuses={misuses} assessmentId={assessmentId} onBack={() => setCurrentStep(5)} onFinish={async () => {
                 await saveProgress()
@@ -3156,6 +3152,8 @@ export default function App() {
         setModelCheckError(null)
         setOcclusionResult(null)
         setOcclusionError(null)
+        setRobustnessResult(null)
+        setRobustnessError(null)
         setMitigatedResult(null)
         setExtendedValidationResult(null)
         setOcclusionAggregatedResult(null)

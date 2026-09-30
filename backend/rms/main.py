@@ -10,7 +10,7 @@ from test_data import CREDIT_APPLICANTS
 from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional, List, Any
 from pymongo import MongoClient, ReturnDocument
 from bson import ObjectId
@@ -222,32 +222,31 @@ cached_test_results_collection = db["cached_test_results"]
 
 #Baut einen eindeutigen Fingerabdruck aus Testtyp + allen relevanten Eingabeparametern
 def build_config_hash(test_type: str, params: dict) -> str:
-    payload = {"test_type": test_type, **params}
+    payload = {"test_type": test_type, "model": OLLAMA_MODEL, **params}
     serialized = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
-#Zentrale Cache-Logik, wiederverwendbar für alle zeitintensiven Tests:
-#- Existiert bereits ein Ergebnis für exakt diese Konfiguration? -> sofort zurückgeben (Cache-Treffer)
-#- Kein Treffer + DEMO_MODE=false (normaler Testbetrieb) -> echten Test ausführen, Ergebnis cachen
-#- Kein Treffer + DEMO_MODE=true (Live-Demo) -> bewusst abbrechen statt in einen ungeplanten, mehrminütigen Live-Call zu laufen ("harte Absicherung")
+#Zentrale Cache-Logik
 def get_or_compute(test_type: str, params: dict, compute_fn):
     config_hash = build_config_hash(test_type, params)
-    cached = cached_test_results_collection.find_one({"config_hash": config_hash})
-
-    if cached:
-        print(f"[CACHE HIT] {test_type} ({config_hash[:8]}...)")
-        return cached["result"]
 
     if DEMO_MODE:
-        print(f"[CACHE MISS - DEMO_MODE] {test_type} ({config_hash[:8]}...) - no prepared test result found")
+        cached = cached_test_results_collection.find_one({"config_hash": config_hash})
+
+        if cached:
+            print(f"[CACHE HIT - DEMO MODE] {test_type} ({config_hash[:8]}...)")
+            return cached["result"]
+
+        print(f"[CACHE MISS - DEMO MODE] {test_type} ({config_hash[:8]}...) - no prepared test result found")
         raise HTTPException(
             status_code=409,
             detail=f"No cached result found for this configuration (test_type={test_type}). "
                    f"Please run this exact test configuration once with DEMO_MODE=false first."
         )
 
-    print(f"[LIVE CALL] {test_type} ({config_hash[:8]}...) - run a real test")
+    print(f"[LIVE CALL] {test_type} ({config_hash[:8]}...) - running a fresh test")
     result = compute_fn()
+
     cached_test_results_collection.update_one(
         {"config_hash": config_hash},
         {"$set": {
@@ -258,6 +257,7 @@ def get_or_compute(test_type: str, params: dict, compute_fn):
         }},
         upsert=True,
     )
+
     return result
 
 app = FastAPI(title="RMS Microservice", version="1.0.0")
@@ -319,8 +319,6 @@ class AssessmentCreate(BaseModel):
     likelihood_scale: List[Any] = []
     impact_scale: List[Any] = []
 
-class OllamaTestRequest(BaseModel):
-    prompt: str
 
 class AssessmentUpdate(BaseModel):
     current_step: Optional[int] = None
@@ -369,56 +367,7 @@ def db_check():
     except Exception as e:
         return {"mongodb": "error", "detail": str(e)}
 
-#Erster Testendpunkt
-@app.post("/ollama-test")
-def ollama_test(payload: OllamaTestRequest):
-    try:
-        response = requests.post(OLLAMA_URL, json={
-            "model": OLLAMA_MODEL,
-            "prompt": payload.prompt,
-            "stream": False,
-            "keep_alive": "30m",
-            "options": {
-                "temperature": 0,
-                "seed": 42,
-                "num_ctx": 2048
-            }
-        })
-        response.raise_for_status()
-        data = response.json()
-        return {"prompt": payload.prompt, "response": data["response"]}
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Could not reach Ollama: {str(e)}")
 
-#Test an einzelnen Antragssteller
-@app.get("/credit-test/{applicant_id}")
-def credit_test(applicant_id: int):
-    applicant = next((a for a in CREDIT_APPLICANTS if a["id"] == applicant_id), None)
-    if not applicant:
-        raise HTTPException(status_code=404, detail="Applicant not found")
-
-    prompt = build_credit_prompt(applicant)
-    try:
-        response = requests.post(OLLAMA_URL, json={
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "stream": False,
-            "keep_alive": "30m",
-            "options": {
-                "temperature": 0,
-                "seed": 42,
-                "num_ctx": 2048
-            }
-        })
-        response.raise_for_status()
-        data = response.json()
-        return {
-            "applicant": applicant,
-            "prompt": prompt,
-            "model_response": data["response"],
-        }
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Could not reach Ollama: {str(e)}")
 
 #custom_prompt optional: wenn gesetzt, wird der Nutzer-Prompt statt des festen Finance-Prompts verwendet
 #Counterfactual Fairness wird bei Built-in-Daten IMMER berechnet, da gender/Paar-Struktur strukturell garantiert ist,
@@ -557,14 +506,6 @@ def compute_credit_metrics_for(applicants: list, omit_field: str = None, custom_
 
     #Counterfactual Fairness braucht paarweise Vergleichsdaten (z.B. gender-Paare) - bei generischen Custom-Prompt-Daten nicht anwendbar, deshalb None statt einer bedeutungslosen Zahl
     counterfactual_fairness = None
-    if not custom_prompt:
-        flipped_pairs = 0
-        total_pairs = len(results) // 2
-        for i in range(0, len(results), 2):
-            pair = results[i:i + 2]
-            if len(pair) == 2 and pair[0]["model_decision"] != pair[1]["model_decision"]:
-                flipped_pairs += 1
-        counterfactual_fairness = round(flipped_pairs / total_pairs, 2) if total_pairs > 0 else None
 
     return {
         "results": results,
@@ -664,42 +605,6 @@ async def credit_metrics_mitigated(payload: dict = None):
 
     return get_or_compute("credit_metrics_mitigated", params, compute)
 
-#Extended Validation für Risiko 8 - mehrere unabhängige Durchläufe statt einem einzelnen
-@app.post("/credit-metrics-extended")
-async def credit_metrics_extended(payload: dict = None, runs: int = 2):
-    payload = payload or {}
-    custom_prompt = payload.get("custom_prompt")
-    positive_label = payload.get("positive_label", "approved")
-    negative_label = payload.get("negative_label", "rejected")
-
-    params = {
-        "custom_prompt": custom_prompt,
-        "positive_label": positive_label,
-        "negative_label": negative_label,
-        "runs": runs,
-    }
-
-    def compute():
-        all_results = [compute_credit_metrics(custom_prompt=custom_prompt, positive_label=positive_label, negative_label=negative_label) for _ in range(runs)]
-        accuracies = [r["accuracy"] for r in all_results]
-        cf_values = [r["counterfactual_fairness"] for r in all_results]
-
-        avg_accuracy = sum(accuracies) / len(accuracies)
-        avg_cf = sum(cf_values) / len(cf_values)
-        accuracy_range = (min(accuracies), max(accuracies))
-        cf_range = (min(cf_values), max(cf_values))
-
-        return {
-            "runs": runs,
-            "individual_accuracies": accuracies,
-            "individual_cf_values": cf_values,
-            "average_accuracy": round(avg_accuracy, 2),
-            "average_counterfactual_fairness": round(avg_cf, 2),
-            "accuracy_range": [round(accuracy_range[0], 2), round(accuracy_range[1], 2)],
-            "cf_range": [round(cf_range[0], 2), round(cf_range[1], 2)],
-        }
-
-    return get_or_compute("credit_metrics_extended", params, compute)
 
 
 #Generische Occlusion-Aggregation-Logik, wiederverwendbar für Built-in und Upload
@@ -1022,7 +927,7 @@ def get_assessment(assessment_id: str):
 
 @app.put("/assessments/{assessment_id}") #ein bestehendes assessment aktualisieren
 def update_assessment(assessment_id: str, payload: AssessmentUpdate):
-    update_data = {k: v for k, v in payload.model_dump().items() if v is not None}
+    update_data = payload.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     try:
