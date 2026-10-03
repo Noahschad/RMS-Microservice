@@ -18,10 +18,15 @@ The prototype implements a software-supported risk management workflow for high-
 
 Install the following software before starting the RMS:
 
-- Python 3
-- Node.js and npm
-- Docker with Docker Compose
-- Ollama
+- Git: https://git-scm.com/downloads
+- Python 3: https://www.python.org/downloads/
+- Node.js and npm: https://nodejs.org/en/download
+- Docker Desktop with Docker Compose: https://www.docker.com/products/docker-desktop/
+- Ollama: https://ollama.com/download
+
+After installation, make sure that Docker Desktop and Ollama are running before starting the RMS.
+
+The prototype was developed and tested with Python 3.12, Node.js 24, npm 11, Docker 29 with Docker Compose 5, and Ollama 0.31.
 
 ## 1. Clone the Repository
 
@@ -54,10 +59,18 @@ Navigate to the backend directory:
 cd backend/rms
 ```
 
-Create a Python virtual environment:
+Create a Python virtual environment.
+
+On macOS or Linux:
 
 ```bash
 python3 -m venv venv
+```
+
+On Windows:
+
+```cmd
+python -m venv venv
 ```
 
 Activate it on macOS or Linux:
@@ -66,16 +79,42 @@ Activate it on macOS or Linux:
 source venv/bin/activate
 ```
 
+On Windows PowerShell:
+
+```powershell
+venv\Scripts\Activate.ps1
+```
+
+On Windows Command Prompt:
+
+```cmd
+venv\Scripts\activate.bat
+```
+
 Install the Python dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Create the local environment file from the provided example:
+Create the local environment file from the provided example.
+
+On macOS or Linux:
 
 ```bash
 cp .env.example .env
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+On Windows Command Prompt:
+
+```cmd
+copy .env.example .env
 ```
 
 The default configuration is:
@@ -128,7 +167,7 @@ http://127.0.0.1:8000/db-check
 
 ## 6. Set Up and Start the Frontend
 
-Open a second terminal and navigate to the frontend directory:
+Open a second terminal, navigate to the cloned `RMS-Microservice` repository root, and then open the frontend directory:
 
 ```bash
 cd frontend/rms-frontend-vite
@@ -196,3 +235,11 @@ RMS-Microservice/
 ## Notes
 
 This repository contains a research prototype developed for a bachelor thesis. It is intended to demonstrate the operationalization of selected risk management requirements of Article 9 of the EU AI Act. It should not be interpreted as a standalone compliance solution or as demonstrating full regulatory compliance.
+
+## Verify the Installation
+
+After starting MongoDB, the backend, and the frontend, verify the setup as follows:
+
+1. Open `http://127.0.0.1:8000/db-check` in a browser. The response should confirm that MongoDB is connected.
+2. Open `http://localhost:5173` in a browser. The RMS user interface should load.
+3. Run one complete assessment workflow in the RMS to confirm that frontend, backend, database, and Ollama are working together.
