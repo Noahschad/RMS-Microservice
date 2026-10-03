@@ -243,3 +243,5 @@ After starting MongoDB, the backend, and the frontend, verify the setup as follo
 1. Open `http://127.0.0.1:8000/db-check` in a browser. The response should confirm that MongoDB is connected.
 2. Open `http://localhost:5173` in a browser. The RMS user interface should load.
 3. Run one complete assessment workflow in the RMS to confirm that frontend, backend, database, and Ollama are working together.
+
+> **Note:** On the first execution of an AI Model Check after starting Ollama, the local model may require a cold start. If the first result is incomplete, run the test once more after the model has warmed up. A fresh installation also does not contain previously cached AI Model Check results.
